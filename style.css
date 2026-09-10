@@ -382,3 +382,65 @@ button.text-btn {
     font-size: 9px;
   }
 }
+
+/* --- Selects (person / frequency) --- */
+
+.select {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  width: 100%;
+  background: #fff;
+  color: #111;
+}
+
+/* --- Filter chips --- */
+
+.filter-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.chip {
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #555;
+}
+
+.chip.active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+/* --- Person tag pill (shown on list rows) --- */
+
+.person-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.person-tag.tag-pawel {
+  background: #e5edfb;
+  color: #2b4c8c;
+}
+
+.person-tag.tag-marta {
+  background: #fbe5f2;
+  color: #96326b;
+}
+
+.person-tag.tag-ogolne {
+  background: #eee;
+  color: #555;
+}

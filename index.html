@@ -13,7 +13,7 @@
     <header>
       <div>
         <p class="label">Total monthly</p>
-        <p class="total" id="total">$0.00</p>
+        <p class="total" id="total">0,00 zł</p>
       </div>
       <button id="add-btn" class="primary">+ Add payment</button>
     </header>
@@ -33,6 +33,24 @@
       <input type="text" id="f-name" placeholder="Payment name (e.g. Rent, Netflix)" />
       <input type="number" id="f-amount" placeholder="Amount" min="0" step="0.01" />
 
+      <div class="row">
+        <div style="flex:1;">
+          <p class="inline-label" style="margin: 0 0 4px;">Assigned to</p>
+          <select id="f-person" class="select">
+            <option value="Ogólne">Ogólne</option>
+            <option value="Paweł">Paweł</option>
+            <option value="Marta">Marta</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <p class="inline-label" style="margin: 0 0 4px;">Frequency</p>
+          <select id="f-frequency" class="select">
+            <option value="1">Every month</option>
+            <option value="2">Every 2 months</option>
+          </select>
+        </div>
+      </div>
+
       <p class="inline-label" style="margin: 0 0 -4px;">Due day of month</p>
       <div id="day-picker" class="day-picker"></div>
       <p class="picker-selected">Selected day: <span id="day-picker-selected">none</span></p>
@@ -47,6 +65,8 @@
         <button id="f-save" class="primary">Save</button>
       </div>
     </div>
+
+    <div id="filter-chips" class="filter-chips"></div>
 
     <div id="list-view">
       <div id="list" class="list"></div>
