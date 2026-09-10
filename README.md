@@ -7,12 +7,19 @@ no backend.
 ## Features
 
 - Add/edit/delete recurring monthly payments (name, amount, due day)
+- Pick the due day from a 1–31 grid picker instead of typing a number
+- Calendar view: a full month grid showing every bill on its due date, with
+  prev/next month navigation, color-coded by status
 - See at a glance which bills are overdue, due soon, or paid
 - Mark a bill as paid for the current month (resets automatically next month)
 - Browser notifications, checked hourly and whenever the tab regains focus
 - Installable as a PWA (desktop or mobile) via the browser's "Install app" option
 - Works offline once loaded, via a small service worker
 - All data stored in the browser's localStorage — no account, no server
+
+Note: payments repeat on the same day every month (e.g. "day 15"), not on
+a specific one-off date — so the calendar view looks the same pattern each
+month except for which bills are marked paid.
 
 ## Running it locally
 
