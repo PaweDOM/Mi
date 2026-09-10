@@ -11,7 +11,6 @@
   const addBtn = document.getElementById('add-btn');
   const fName = document.getElementById('f-name');
   const fAmount = document.getElementById('f-amount');
-  const fDay = document.getElementById('f-day');
   const fLead = document.getElementById('f-lead');
   const fError = document.getElementById('f-error');
   const fSave = document.getElementById('f-save');
@@ -20,10 +19,23 @@
   const notifEnable = document.getElementById('notif-enable');
   const notifDismiss = document.getElementById('notif-dismiss');
 
+  const tabList = document.getElementById('tab-list');
+  const tabCalendar = document.getElementById('tab-calendar');
+  const listView = document.getElementById('list-view');
+  const calendarView = document.getElementById('calendar-view');
+  const dayPicker = document.getElementById('day-picker');
+  const dayPickerSelected = document.getElementById('day-picker-selected');
+  const calGrid = document.getElementById('cal-grid');
+  const calMonthLabel = document.getElementById('cal-month-label');
+  const calPrev = document.getElementById('cal-prev');
+  const calNext = document.getElementById('cal-next');
+
   let payments = [];
   let paidStatus = {};
   let lastNotified = {};
   let editingId = null;
+  let selectedDay = null;
+  let calCursor = new Date(); // month currently shown in the calendar view
 
   function monthKey(date = new Date()) {
     return `${date.getFullYear()}-${date.getMonth() + 1}`;
@@ -78,6 +90,123 @@
   function saveLastNotified() {
     localStorage.setItem(NOTIFIED_KEY, JSON.stringify(lastNotified));
   }
+
+  // --- Day picker (grid of 1-31 for choosing a due day) ---
+
+  function buildDayPicker() {
+    dayPicker.innerHTML = '';
+    for (let d = 1; d <= 31; d++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = d;
+      btn.dataset.day = d;
+      btn.addEventListener('click', () => selectDay(d));
+      dayPicker.appendChild(btn);
+    }
+  }
+
+  function selectDay(d) {
+    selectedDay = d;
+    dayPickerSelected.textContent = d;
+    dayPicker.querySelectorAll('button').forEach((btn) => {
+      btn.classList.toggle('selected', Number(btn.dataset.day) === d);
+    });
+  }
+
+  // --- Tabs ---
+
+  function showListView() {
+    tabList.classList.add('active');
+    tabCalendar.classList.remove('active');
+    listView.classList.remove('hidden');
+    calendarView.classList.add('hidden');
+  }
+
+  function showCalendarView() {
+    tabCalendar.classList.add('active');
+    tabList.classList.remove('active');
+    calendarView.classList.remove('hidden');
+    listView.classList.add('hidden');
+    renderCalendar();
+  }
+
+  tabList.addEventListener('click', showListView);
+  tabCalendar.addEventListener('click', showCalendarView);
+
+  // --- Calendar month view ---
+
+  function renderCalendar() {
+    const year = calCursor.getFullYear();
+    const month = calCursor.getMonth();
+    calMonthLabel.textContent = calCursor.toLocaleDateString(undefined, {
+      month: 'long',
+      year: 'numeric',
+    });
+
+    calGrid.innerHTML = '';
+    const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    dowNames.forEach((name) => {
+      const el = document.createElement('div');
+      el.className = 'cal-dow';
+      el.textContent = name;
+      calGrid.appendChild(el);
+    });
+
+    const firstDow = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+    const key = monthKey(new Date(year, month, 1));
+
+    for (let i = 0; i < firstDow; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell empty';
+      calGrid.appendChild(cell);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      if (isCurrentMonth && today.getDate() === day) cell.classList.add('today');
+
+      const dateEl = document.createElement('p');
+      dateEl.className = 'cal-date';
+      dateEl.textContent = day;
+      cell.appendChild(dateEl);
+
+      payments
+        .filter((p) => p.day === day)
+        .forEach((p) => {
+          const paidKey = `${key}:${p.id}`;
+          const isPaid = !!paidStatus[paidKey];
+          let cls = 'muted';
+          if (isPaid) {
+            cls = 'success';
+          } else if (isCurrentMonth) {
+            const d = daysUntil(p.day);
+            if (d <= 0) cls = 'danger';
+            else if (d <= (p.daysBefore ?? 5)) cls = 'warning';
+          }
+          const pill = document.createElement('span');
+          pill.className = `cal-pill ${cls}`;
+          pill.textContent = p.name;
+          pill.title = `${p.name} — ${fmt(p.amount)}`;
+          cell.appendChild(pill);
+        });
+
+      calGrid.appendChild(cell);
+    }
+  }
+
+  calPrev.addEventListener('click', () => {
+    calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() - 1, 1);
+    renderCalendar();
+  });
+
+  calNext.addEventListener('click', () => {
+    calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 1);
+    renderCalendar();
+  });
 
   // --- Notifications ---
 
@@ -181,12 +310,14 @@
     paidStatus[key] = !paidStatus[key];
     savePaidStatus();
     render();
+    if (!calendarView.classList.contains('hidden')) renderCalendar();
   }
 
   function deletePayment(id) {
     payments = payments.filter((p) => p.id !== id);
     savePayments();
     render();
+    if (!calendarView.classList.contains('hidden')) renderCalendar();
   }
 
   function editPayment(id) {
@@ -195,7 +326,7 @@
     editingId = id;
     fName.value = p.name;
     fAmount.value = p.amount;
-    fDay.value = p.day;
+    selectDay(p.day);
     fLead.value = p.daysBefore ?? 2;
     fError.classList.add('hidden');
     form.classList.remove('hidden');
@@ -207,7 +338,9 @@
     editingId = null;
     fName.value = '';
     fAmount.value = '';
-    fDay.value = '';
+    selectedDay = null;
+    dayPickerSelected.textContent = 'none';
+    dayPicker.querySelectorAll('button').forEach((btn) => btn.classList.remove('selected'));
     fLead.value = '2';
     fError.classList.add('hidden');
     fSave.textContent = 'Save';
@@ -228,11 +361,11 @@
   fSave.addEventListener('click', () => {
     const name = fName.value.trim();
     const amount = parseFloat(fAmount.value);
-    const day = parseInt(fDay.value, 10);
+    const day = selectedDay;
     const lead = parseInt(fLead.value || '2', 10);
 
-    if (!name || isNaN(amount) || amount < 0 || isNaN(day) || day < 1 || day > 31) {
-      fError.textContent = 'Enter a name, a valid amount, and a due day between 1 and 31.';
+    if (!name || isNaN(amount) || amount < 0 || !day) {
+      fError.textContent = 'Enter a name, a valid amount, and pick a due day on the calendar above.';
       fError.classList.remove('hidden');
       return;
     }
@@ -254,6 +387,7 @@
     resetForm();
     savePayments();
     render();
+    if (!calendarView.classList.contains('hidden')) renderCalendar();
     checkAndNotify();
   });
 
@@ -268,6 +402,7 @@
 
   function init() {
     load();
+    buildDayPicker();
     updateNotifBanner();
     render();
     checkAndNotify();

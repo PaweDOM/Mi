@@ -18,6 +18,11 @@
       <button id="add-btn" class="primary">+ Add payment</button>
     </header>
 
+    <div class="tabs">
+      <button id="tab-list" class="tab active">List</button>
+      <button id="tab-calendar" class="tab">Calendar</button>
+    </div>
+
     <p id="notif-banner" class="banner hidden">
       Enable notifications to get reminded before bills are due.
       <button id="notif-enable">Enable</button>
@@ -26,10 +31,12 @@
 
     <div id="form" class="form hidden">
       <input type="text" id="f-name" placeholder="Payment name (e.g. Rent, Netflix)" />
-      <div class="row">
-        <input type="number" id="f-amount" placeholder="Amount" min="0" step="0.01" />
-        <input type="number" id="f-day" placeholder="Due day (1-31)" min="1" max="31" step="1" />
-      </div>
+      <input type="number" id="f-amount" placeholder="Amount" min="0" step="0.01" />
+
+      <p class="inline-label" style="margin: 0 0 -4px;">Due day of month</p>
+      <div id="day-picker" class="day-picker"></div>
+      <p class="picker-selected">Selected day: <span id="day-picker-selected">none</span></p>
+
       <div class="row">
         <label for="f-lead" class="inline-label">Remind me this many days before:</label>
         <input type="number" id="f-lead" placeholder="2" min="0" max="27" step="1" style="max-width: 70px;" />
@@ -41,8 +48,19 @@
       </div>
     </div>
 
-    <div id="list" class="list"></div>
-    <p id="empty" class="empty hidden">No payments yet. Add your first one above.</p>
+    <div id="list-view">
+      <div id="list" class="list"></div>
+      <p id="empty" class="empty hidden">No payments yet. Add your first one above.</p>
+    </div>
+
+    <div id="calendar-view" class="hidden">
+      <div class="cal-header">
+        <button id="cal-prev">&larr;</button>
+        <p id="cal-month-label" class="cal-month-label"></p>
+        <button id="cal-next">&rarr;</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
   </div>
 
   <script src="app.js"></script>

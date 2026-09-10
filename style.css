@@ -228,3 +228,157 @@ button.text-btn {
     gap: 10px;
   }
 }
+
+/* --- Tabs --- */
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.tab {
+  border: none;
+  background: none;
+  border-radius: 0;
+  padding: 8px 4px;
+  margin-right: 14px;
+  font-size: 14px;
+  color: #888;
+  border-bottom: 2px solid transparent;
+}
+
+.tab:hover {
+  background: none;
+  color: #111;
+}
+
+.tab.active {
+  color: #111;
+  font-weight: 600;
+  border-bottom-color: #111;
+}
+
+.hidden {
+  display: none;
+}
+
+/* --- Day picker (grid of 1-31 for choosing a due day) --- */
+
+.day-picker {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.day-picker button {
+  padding: 6px 0;
+  font-size: 13px;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.day-picker button.selected {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.picker-selected {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+}
+
+/* --- Calendar month view --- */
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.cal-month-label {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-dow {
+  font-size: 11px;
+  color: #999;
+  text-align: center;
+  padding-bottom: 4px;
+}
+
+.cal-cell {
+  min-height: 64px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  background: #fff;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cal-cell.empty {
+  border: none;
+  background: transparent;
+}
+
+.cal-cell.today {
+  border-color: #111;
+}
+
+.cal-date {
+  font-size: 11px;
+  color: #999;
+  margin: 0 0 2px;
+}
+
+.cal-pill {
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-pill.danger {
+  background: #fcebeb;
+  color: #a32d2d;
+}
+
+.cal-pill.warning {
+  background: #faeeda;
+  color: #854f0b;
+}
+
+.cal-pill.success {
+  background: #e1f5ee;
+  color: #0f6e56;
+}
+
+.cal-pill.muted {
+  background: #f1efe8;
+  color: #5f5e5a;
+}
+
+@media (max-width: 480px) {
+  .cal-cell {
+    min-height: 48px;
+  }
+  .cal-pill {
+    font-size: 9px;
+  }
+}
