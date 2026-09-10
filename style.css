@@ -165,6 +165,13 @@ button.text-btn {
   margin: 0;
 }
 
+.payment-notes {
+  font-size: 12px;
+  color: #888;
+  margin: 2px 0 0;
+  font-style: italic;
+}
+
 .payment-actions {
   display: flex;
   align-items: center;

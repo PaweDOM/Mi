@@ -11,6 +11,7 @@
   const addBtn = document.getElementById('add-btn');
   const fName = document.getElementById('f-name');
   const fAmount = document.getElementById('f-amount');
+  const fNotes = document.getElementById('f-notes');
   const fPerson = document.getElementById('f-person');
   const fFrequency = document.getElementById('f-frequency');
   const fLead = document.getElementById('f-lead');
@@ -260,7 +261,7 @@
           const pill = document.createElement('span');
           pill.className = `cal-pill ${cls}`;
           pill.textContent = p.name;
-          pill.title = `${p.name} — ${fmt(p.amount)} — ${p.person || 'Ogólne'}`;
+          pill.title = `${p.name} — ${fmt(p.amount)} — ${p.person || 'Ogólne'}${p.notes ? ' — ' + p.notes : ''}`;
           cell.appendChild(pill);
         });
 
@@ -355,6 +356,7 @@
           <div>
             <p class="payment-name">${escapeHtml(p.name)}</p>
             <p class="payment-detail">${fmt(p.amount)} · due day ${p.day} · ${freqLabel}</p>
+            ${p.notes ? `<p class="payment-notes">${escapeHtml(p.notes)}</p>` : ''}
             <span class="person-tag ${personTagClass(person)}">${escapeHtml(person)}</span>
           </div>
           <span class="badge ${st.cls}">${st.label}</span>
@@ -406,6 +408,7 @@
     editingId = id;
     fName.value = p.name;
     fAmount.value = p.amount;
+    fNotes.value = p.notes || '';
     fPerson.value = p.person || 'Ogólne';
     fFrequency.value = String(p.frequency || 1);
     selectDay(p.day);
@@ -420,6 +423,7 @@
     editingId = null;
     fName.value = '';
     fAmount.value = '';
+    fNotes.value = '';
     fPerson.value = 'Ogólne';
     fFrequency.value = '1';
     selectedDay = null;
@@ -445,6 +449,7 @@
   fSave.addEventListener('click', () => {
     const name = fName.value.trim();
     const amount = parseFloat(fAmount.value);
+    const notes = fNotes.value.trim();
     const day = selectedDay;
     const lead = parseInt(fLead.value || '2', 10);
     const person = fPerson.value;
@@ -460,7 +465,7 @@
     if (editingId) {
       payments = payments.map((p) => {
         if (p.id !== editingId) return p;
-        const next = { ...p, name, amount, day, daysBefore: lead, person, frequency };
+        const next = { ...p, name, amount, day, daysBefore: lead, person, frequency, notes };
         // If the frequency changed on an existing bill, re-anchor to the
         // current month so "every 2 months" starts counting from now.
         if ((p.frequency || 1) !== frequency) {
@@ -480,6 +485,7 @@
         daysBefore: isNaN(lead) ? 2 : lead,
         person,
         frequency,
+        notes,
         anchorYear: now.getFullYear(),
         anchorMonth: now.getMonth(),
       });
