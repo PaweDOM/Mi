@@ -1,6 +1,27 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getDatabase,
+  ref,
+  onValue,
+  set as dbSet,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDQqsm2QzuZykRlngOsRmr--IeTGTynZCY",
+  authDomain: "payment-reminders-d9e7f.firebaseapp.com",
+  databaseURL: "https://payment-reminders-d9e7f-default-rtdb.firebaseio.com",
+  projectId: "payment-reminders-d9e7f",
+  storageBucket: "payment-reminders-d9e7f.firebasestorage.app",
+  messagingSenderId: "57500988928",
+  appId: "1:57500988928:web:77894f486bcc48f66acae5",
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getDatabase(firebaseApp);
+const paymentsRef = ref(db, "payments");
+const paidStatusRef = ref(db, "paidStatus");
+
 (function () {
-  const STORAGE_KEY = 'payment-reminders:payments';
-  const PAID_KEY = 'payment-reminders:paidStatus';
   const NOTIFIED_KEY = 'payment-reminders:lastNotified';
   const BANNER_DISMISSED_KEY = 'payment-reminders:notifBannerDismissed';
 
@@ -22,6 +43,7 @@
   const notifEnable = document.getElementById('notif-enable');
   const notifDismiss = document.getElementById('notif-dismiss');
   const filterChipsEl = document.getElementById('filter-chips');
+  const syncStatusEl = document.getElementById('sync-status');
 
   const PEOPLE = ['Paweł', 'Marta', 'Ogólne'];
   let activeFilter = 'All';
@@ -109,18 +131,84 @@
   }
 
   // --- Persistence ---
+  //
+  // payments and paidStatus live in Firebase Realtime Database and sync
+  // live between anyone with this site open. lastNotified and the banner
+  // dismissal are per-device UI bookkeeping and stay in localStorage.
 
-  function load() {
-    try {
-      payments = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    } catch (e) {
-      payments = [];
+  function paymentsToObj(arr) {
+    const obj = {};
+    arr.forEach((p) => { obj[p.id] = p; });
+    return obj;
+  }
+
+  function objToArray(obj) {
+    return obj ? Object.values(obj) : [];
+  }
+
+  let firebaseReady = { payments: false, paidStatus: false };
+
+  function markConnected() {
+    if (firebaseReady.payments && firebaseReady.paidStatus) {
+      syncStatusEl.textContent = 'Live — synced with anyone who has this site open';
+      syncStatusEl.className = 'sync-note live';
     }
-    try {
-      paidStatus = JSON.parse(localStorage.getItem(PAID_KEY) || '{}');
-    } catch (e) {
-      paidStatus = {};
+  }
+
+  onValue(
+    paymentsRef,
+    (snapshot) => {
+      payments = objToArray(snapshot.val());
+      firebaseReady.payments = true;
+      markConnected();
+      render();
+      if (!calendarView.classList.contains('hidden')) renderCalendar();
+      checkAndNotify();
+    },
+    (error) => {
+      console.error('Firebase payments read failed', error);
+      syncStatusEl.textContent = 'Could not connect to shared storage — check your connection.';
+      syncStatusEl.className = 'sync-note error';
     }
+  );
+
+  onValue(
+    paidStatusRef,
+    (snapshot) => {
+      paidStatus = snapshot.val() || {};
+      firebaseReady.paidStatus = true;
+      markConnected();
+      render();
+      if (!calendarView.classList.contains('hidden')) renderCalendar();
+    },
+    (error) => {
+      console.error('Firebase paidStatus read failed', error);
+      syncStatusEl.textContent = 'Could not connect to shared storage — check your connection.';
+      syncStatusEl.className = 'sync-note error';
+    }
+  );
+
+  async function savePayments() {
+    try {
+      await dbSet(paymentsRef, paymentsToObj(payments));
+    } catch (e) {
+      console.error('Failed to save payments', e);
+      syncStatusEl.textContent = 'Save failed — check your connection and try again.';
+      syncStatusEl.className = 'sync-note error';
+    }
+  }
+
+  async function savePaidStatus() {
+    try {
+      await dbSet(paidStatusRef, paidStatus);
+    } catch (e) {
+      console.error('Failed to save paid status', e);
+      syncStatusEl.textContent = 'Save failed — check your connection and try again.';
+      syncStatusEl.className = 'sync-note error';
+    }
+  }
+
+  function loadLocalOnly() {
     try {
       lastNotified = JSON.parse(localStorage.getItem(NOTIFIED_KEY) || '{}');
     } catch (e) {
@@ -128,12 +216,6 @@
     }
   }
 
-  function savePayments() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payments));
-  }
-  function savePaidStatus() {
-    localStorage.setItem(PAID_KEY, JSON.stringify(paidStatus));
-  }
   function saveLastNotified() {
     localStorage.setItem(NOTIFIED_KEY, JSON.stringify(lastNotified));
   }
@@ -509,7 +591,7 @@
   });
 
   function init() {
-    load();
+    loadLocalOnly();
     buildDayPicker();
     buildFilterChips();
     updateNotifBanner();
