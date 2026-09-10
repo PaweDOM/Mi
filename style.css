@@ -34,6 +34,20 @@ header {
   margin: 2px 0 0;
 }
 
+.sync-note {
+  font-size: 11px;
+  color: #999;
+  margin: -8px 0 16px;
+}
+
+.sync-note.live {
+  color: #0f6e56;
+}
+
+.sync-note.error {
+  color: #a32d2d;
+}
+
 button {
   border: 1px solid #ddd;
   background: #fff;
@@ -450,4 +464,50 @@ button.text-btn {
 .person-tag.tag-ogolne {
   background: #eee;
   color: #555;
+}
+
+/* --- Login screen --- */
+
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-screen.hidden {
+  display: none;
+}
+
+.login-box {
+  width: 100%;
+  max-width: 320px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.login-sub {
+  font-size: 13px;
+  color: #666;
+  margin: 0 0 4px;
+}
+
+.login-box input[type="password"] {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  width: 100%;
 }

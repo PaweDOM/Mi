@@ -20,9 +20,12 @@ live data (e.g. you and a partner).
 - Mark a bill as paid for its current cycle (resets automatically at the
   next occurrence — one month later for monthly bills, two for bi-monthly)
 - Amounts shown in PLN
+- Amounts shown in PLN
+- **Password-protected**: one shared household login gates access to the
+  app and the data
 - **Shared, live data**: payments and paid status sync through Firebase
-  Realtime Database — anyone with the site open sees changes from anyone
-  else, automatically, no manual refresh needed
+  Realtime Database — anyone logged in sees changes from anyone else,
+  automatically, no manual refresh needed
 - Browser notifications, checked hourly and whenever the tab regains focus
 - Installable as a PWA (desktop or mobile) via the browser's "Install app" option
 
@@ -33,28 +36,47 @@ there — so the calendar only shows it every other month.
 
 ## Firebase setup
 
-This app expects a Firebase Realtime Database. The config is already
+This app expects a Firebase project with **Realtime Database** and
+**Authentication (Email/Password)** both enabled. The config is already
 embedded at the top of `app.js` (`firebaseConfig`) — if you fork this for
 your own project, replace it with your own project's config from the
 Firebase console (Project settings → your web app).
 
-Database rules: this app currently expects **open read/write** access
-(no login) at the `/payments` and `/paidStatus` paths, since it's built
-for a small private/family use case with no auth. Firebase's default
-"test mode" rules expire after 30 days — after that, set rules like:
+### One-time setup for the shared login
+
+1. In Firebase console → Build → Authentication → Sign-in method, enable
+   the **Email/Password** provider.
+2. In Authentication → Users, click "Add user." Use the email
+   `household@payment-reminders.local` (this must match the
+   `HOUSEHOLD_EMAIL` constant near the top of `app.js`) and choose
+   whatever password you want the household to use.
+3. That's it — anyone who knows the password can log in on the app's
+   login screen. There's only one shared account, not separate logins
+   per person; the "Assigned to" field in the app is just a label, not a
+   real per-user permission system.
+
+To change the password later, go to Authentication → Users, find that
+one user, and reset its password from the console.
+
+### Database rules
+
+Since the app now requires login, the database rules should require
+authentication rather than being fully open:
 
 ```json
 {
   "rules": {
-    "payments": { ".read": true, ".write": true },
-    "paidStatus": { ".read": true, ".write": true }
+    "payments": { ".read": "auth != null", ".write": "auth != null" },
+    "paidStatus": { ".read": "auth != null", ".write": "auth != null" }
   }
 }
 ```
 
-in Firebase console → Realtime Database → Rules. Anyone with your
-`databaseURL` could technically read/write this data, so don't put
-sensitive info in the notes field (e.g. full account numbers).
+Paste this into Firebase console → Realtime Database → Rules → Publish.
+This replaces the earlier fully-open rules and means only someone who has
+logged in with the household password can read or write the data —
+importantly, these rules don't expire the way Firebase's default test-mode
+rules do.
 
 ## Running it locally
 
