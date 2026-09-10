@@ -5,6 +5,14 @@ import {
   onValue,
   set as dbSet,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  setPersistence,
+  browserLocalPersistence,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDQqsm2QzuZykRlngOsRmr--IeTGTynZCY",
@@ -16,10 +24,21 @@ const firebaseConfig = {
   appId: "1:57500988928:web:77894f486bcc48f66acae5",
 };
 
+// The app uses one shared household account rather than per-person accounts.
+// This email is just an identifier for that one Firebase Auth user — it
+// doesn't need to be a real inbox. Create it once in Firebase console →
+// Authentication → Users, with whatever password you choose there.
+const HOUSEHOLD_EMAIL = "household@payment-reminders.local";
+
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
+const auth = getAuth(firebaseApp);
 const paymentsRef = ref(db, "payments");
 const paidStatusRef = ref(db, "paidStatus");
+
+setPersistence(auth, browserLocalPersistence).catch((e) => {
+  console.error('Failed to set auth persistence', e);
+});
 
 (function () {
   const NOTIFIED_KEY = 'payment-reminders:lastNotified';
@@ -44,6 +63,12 @@ const paidStatusRef = ref(db, "paidStatus");
   const notifDismiss = document.getElementById('notif-dismiss');
   const filterChipsEl = document.getElementById('filter-chips');
   const syncStatusEl = document.getElementById('sync-status');
+  const loginScreen = document.getElementById('login-screen');
+  const appRoot = document.getElementById('app-root');
+  const loginPassword = document.getElementById('login-password');
+  const loginSubmit = document.getElementById('login-submit');
+  const loginError = document.getElementById('login-error');
+  const logoutBtn = document.getElementById('logout-btn');
 
   const PEOPLE = ['Paweł', 'Marta', 'Ogólne'];
   let activeFilter = 'All';
@@ -147,6 +172,7 @@ const paidStatusRef = ref(db, "paidStatus");
   }
 
   let firebaseReady = { payments: false, paidStatus: false };
+  let listenersAttached = false;
 
   function markConnected() {
     if (firebaseReady.payments && firebaseReady.paidStatus) {
@@ -155,38 +181,43 @@ const paidStatusRef = ref(db, "paidStatus");
     }
   }
 
-  onValue(
-    paymentsRef,
-    (snapshot) => {
-      payments = objToArray(snapshot.val());
-      firebaseReady.payments = true;
-      markConnected();
-      render();
-      if (!calendarView.classList.contains('hidden')) renderCalendar();
-      checkAndNotify();
-    },
-    (error) => {
-      console.error('Firebase payments read failed', error);
-      syncStatusEl.textContent = 'Could not connect to shared storage — check your connection.';
-      syncStatusEl.className = 'sync-note error';
-    }
-  );
+  function attachDataListeners() {
+    if (listenersAttached) return;
+    listenersAttached = true;
 
-  onValue(
-    paidStatusRef,
-    (snapshot) => {
-      paidStatus = snapshot.val() || {};
-      firebaseReady.paidStatus = true;
-      markConnected();
-      render();
-      if (!calendarView.classList.contains('hidden')) renderCalendar();
-    },
-    (error) => {
-      console.error('Firebase paidStatus read failed', error);
-      syncStatusEl.textContent = 'Could not connect to shared storage — check your connection.';
-      syncStatusEl.className = 'sync-note error';
-    }
-  );
+    onValue(
+      paymentsRef,
+      (snapshot) => {
+        payments = objToArray(snapshot.val());
+        firebaseReady.payments = true;
+        markConnected();
+        render();
+        if (!calendarView.classList.contains('hidden')) renderCalendar();
+        checkAndNotify();
+      },
+      (error) => {
+        console.error('Firebase payments read failed', error);
+        syncStatusEl.textContent = 'Could not connect to shared storage — check your connection.';
+        syncStatusEl.className = 'sync-note error';
+      }
+    );
+
+    onValue(
+      paidStatusRef,
+      (snapshot) => {
+        paidStatus = snapshot.val() || {};
+        firebaseReady.paidStatus = true;
+        markConnected();
+        render();
+        if (!calendarView.classList.contains('hidden')) renderCalendar();
+      },
+      (error) => {
+        console.error('Firebase paidStatus read failed', error);
+        syncStatusEl.textContent = 'Could not connect to shared storage — check your connection.';
+        syncStatusEl.className = 'sync-note error';
+      }
+    );
+  }
 
   async function savePayments() {
     try {
@@ -590,13 +621,69 @@ const paidStatusRef = ref(db, "paidStatus");
     }
   });
 
+  // --- Login / logout ---
+
+  function showApp() {
+    loginScreen.classList.add('hidden');
+    appRoot.classList.remove('hidden');
+  }
+
+  function showLogin() {
+    appRoot.classList.add('hidden');
+    loginScreen.classList.remove('hidden');
+    loginPassword.value = '';
+    loginError.classList.add('hidden');
+    loginPassword.focus();
+  }
+
+  async function attemptLogin() {
+    const password = loginPassword.value;
+    if (!password) {
+      loginError.textContent = 'Enter the household password.';
+      loginError.classList.remove('hidden');
+      return;
+    }
+    loginSubmit.disabled = true;
+    loginSubmit.textContent = 'Logging in…';
+    try {
+      await signInWithEmailAndPassword(auth, HOUSEHOLD_EMAIL, password);
+      loginError.classList.add('hidden');
+    } catch (e) {
+      console.error('Login failed', e);
+      loginError.textContent = 'Incorrect password. Try again.';
+      loginError.classList.remove('hidden');
+    }
+    loginSubmit.disabled = false;
+    loginSubmit.textContent = 'Log in';
+  }
+
+  loginSubmit.addEventListener('click', attemptLogin);
+  loginPassword.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') attemptLogin();
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error('Sign out failed', e);
+    }
+  });
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      showApp();
+      attachDataListeners();
+    } else {
+      showLogin();
+    }
+  });
+
   function init() {
     loadLocalOnly();
     buildDayPicker();
     buildFilterChips();
     updateNotifBanner();
-    render();
-    checkAndNotify();
     setInterval(checkAndNotify, 60 * 60 * 1000);
 
     if ('serviceWorker' in navigator) {

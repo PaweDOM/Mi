@@ -9,7 +9,17 @@
   <meta name="theme-color" content="#111111" />
 </head>
 <body>
-  <div class="app">
+  <div id="login-screen" class="login-screen">
+    <div class="login-box">
+      <p class="login-title">Payment Reminders</p>
+      <p class="login-sub">Enter the household password to continue.</p>
+      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" />
+      <p id="login-error" class="error hidden"></p>
+      <button id="login-submit" class="primary" style="width:100%;">Log in</button>
+    </div>
+  </div>
+
+  <div class="app hidden" id="app-root">
     <header>
       <div>
         <p class="label">Total monthly</p>
@@ -19,6 +29,7 @@
     </header>
 
     <p id="sync-status" class="sync-note">Connecting…</p>
+    <button id="logout-btn" class="text-btn" style="padding:0; margin: -12px 0 12px; font-size:12px;">Log out</button>
 
     <div class="tabs">
       <button id="tab-list" class="tab active">List</button>
