@@ -37,6 +37,7 @@ const paymentsRef = ref(db, "payments");
 const paidStatusRef = ref(db, "paidStatus");
 const pantryRef = ref(db, "pantry");
 const trashRef = ref(db, "trash");
+const shoppingRef = ref(db, "shopping");
 
 setPersistence(auth, browserLocalPersistence).catch((e) => {
   console.error('Failed to set auth persistence', e);
@@ -75,11 +76,28 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   // --- Section nav ---
   const navPayments = document.getElementById('nav-payments');
+  const navShopping = document.getElementById('nav-shopping');
   const navPantry = document.getElementById('nav-pantry');
   const navTrash = document.getElementById('nav-trash');
   const sectionPayments = document.getElementById('section-payments');
+  const sectionShopping = document.getElementById('section-shopping');
   const sectionPantry = document.getElementById('section-pantry');
   const sectionTrash = document.getElementById('section-trash');
+
+  // --- Shopping list (Lista zakupów) elements ---
+  const shoppingCountEl = document.getElementById('shopping-count');
+  const shoppingTabOgolne = document.getElementById('shopping-tab-ogolne');
+  const shoppingTabComiesieczne = document.getElementById('shopping-tab-comiesieczne');
+  const shoppingListOgolne = document.getElementById('shopping-list-ogolne');
+  const shoppingListComiesieczne = document.getElementById('shopping-list-comiesieczne');
+  const shoppingInputOgolne = document.getElementById('shopping-input-ogolne');
+  const shoppingInputComiesieczne = document.getElementById('shopping-input-comiesieczne');
+  const shoppingAddOgolne = document.getElementById('shopping-add-ogolne');
+  const shoppingAddComiesieczne = document.getElementById('shopping-add-comiesieczne');
+  const shoppingItemsOgolne = document.getElementById('shopping-items-ogolne');
+  const shoppingItemsComiesieczne = document.getElementById('shopping-items-comiesieczne');
+  const shoppingEmptyOgolne = document.getElementById('shopping-empty-ogolne');
+  const shoppingEmptyComiesieczne = document.getElementById('shopping-empty-comiesieczne');
 
   // --- Pantry (Składzik) elements ---
   const pantryListEl = document.getElementById('pantry-list');
@@ -90,6 +108,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const pName = document.getElementById('p-name');
   const pAmount = document.getElementById('p-amount');
   const pUnit = document.getElementById('p-unit');
+  const pType = document.getElementById('p-type');
   const pantryError = document.getElementById('pantry-error');
   const pantrySave = document.getElementById('pantry-save');
   const pantryCancel = document.getElementById('pantry-cancel');
@@ -149,11 +168,17 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   function showSection(name) {
     sectionPayments.classList.toggle('hidden', name !== 'payments');
+    sectionShopping.classList.toggle('hidden', name !== 'shopping');
     sectionPantry.classList.toggle('hidden', name !== 'pantry');
     sectionTrash.classList.toggle('hidden', name !== 'trash');
     navPayments.classList.toggle('active', name === 'payments');
+    navShopping.classList.toggle('active', name === 'shopping');
     navPantry.classList.toggle('active', name === 'pantry');
     navTrash.classList.toggle('active', name === 'trash');
+    if (name === 'shopping') {
+      renderShoppingList('ogolne');
+      renderShoppingList('comiesieczne');
+    }
     if (name === 'pantry') renderPantry();
     if (name === 'trash') {
       renderTrashList();
@@ -162,6 +187,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   }
 
   navPayments.addEventListener('click', () => showSection('payments'));
+  navShopping.addEventListener('click', () => showSection('shopping'));
   navPantry.addEventListener('click', () => showSection('pantry'));
   navTrash.addEventListener('click', () => showSection('trash'));
 
@@ -247,12 +273,13 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   let pantryItems = [];
   let trashDates = [];
+  let shoppingItems = { ogolne: [], comiesieczne: [] };
 
-  let firebaseReady = { payments: false, paidStatus: false, pantry: false, trash: false };
+  let firebaseReady = { payments: false, paidStatus: false, pantry: false, trash: false, shopping: false };
   let listenersAttached = false;
 
   function markConnected() {
-    if (firebaseReady.payments && firebaseReady.paidStatus && firebaseReady.pantry && firebaseReady.trash) {
+    if (firebaseReady.payments && firebaseReady.paidStatus && firebaseReady.pantry && firebaseReady.trash && firebaseReady.shopping) {
       syncStatusEl.textContent = 'Na żywo — zsynchronizowane z każdym, kto ma otwartą tę stronę';
       syncStatusEl.className = 'sync-note live';
     }
@@ -261,6 +288,28 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   function attachDataListeners() {
     if (listenersAttached) return;
     listenersAttached = true;
+
+    onValue(
+      shoppingRef,
+      (snapshot) => {
+        const val = snapshot.val() || {};
+        shoppingItems = {
+          ogolne: objToArray(val.ogolne),
+          comiesieczne: objToArray(val.comiesieczne),
+        };
+        firebaseReady.shopping = true;
+        markConnected();
+        if (!sectionShopping.classList.contains('hidden')) {
+          renderShoppingList('ogolne');
+          renderShoppingList('comiesieczne');
+        }
+      },
+      (error) => {
+        console.error('Firebase shopping read failed', error);
+        syncStatusEl.textContent = 'Nie można połączyć się z pamięcią współdzieloną — sprawdź połączenie.';
+        syncStatusEl.className = 'sync-note error';
+      }
+    );
 
     onValue(
       pantryRef,
@@ -353,6 +402,19 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       await dbSet(pantryRef, paymentsToObj(pantryItems));
     } catch (e) {
       console.error('Failed to save pantry', e);
+      syncStatusEl.textContent = 'Zapis nie powiódł się — sprawdź połączenie i spróbuj ponownie.';
+      syncStatusEl.className = 'sync-note error';
+    }
+  }
+
+  async function saveShopping() {
+    try {
+      await dbSet(shoppingRef, {
+        ogolne: paymentsToObj(shoppingItems.ogolne),
+        comiesieczne: paymentsToObj(shoppingItems.comiesieczne),
+      });
+    } catch (e) {
+      console.error('Failed to save shopping list', e);
       syncStatusEl.textContent = 'Zapis nie powiódł się — sprawdź połączenie i spróbuj ponownie.';
       syncStatusEl.className = 'sync-note error';
     }
@@ -765,9 +827,117 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     }
   });
 
+  // ============================= LISTA ZAKUPÓW (Shopping) =============================
+
+  const SHOPPING_LISTS = {
+    ogolne: {
+      items: shoppingItemsOgolne,
+      empty: shoppingEmptyOgolne,
+      input: shoppingInputOgolne,
+      addBtn: shoppingAddOgolne,
+    },
+    comiesieczne: {
+      items: shoppingItemsComiesieczne,
+      empty: shoppingEmptyComiesieczne,
+      input: shoppingInputComiesieczne,
+      addBtn: shoppingAddComiesieczne,
+    },
+  };
+
+  function renderShoppingList(listName) {
+    const refs = SHOPPING_LISTS[listName];
+    const items = shoppingItems[listName] || [];
+    refs.items.innerHTML = '';
+    refs.empty.classList.toggle('hidden', items.length !== 0);
+
+    const totalUnchecked = shoppingItems.ogolne.filter((i) => !i.checked).length +
+      shoppingItems.comiesieczne.filter((i) => !i.checked).length;
+    shoppingCountEl.textContent = String(totalUnchecked);
+
+    const sorted = [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
+
+    sorted.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'checklist-item' + (item.checked ? ' checked' : '');
+      row.innerHTML = `
+        <input type="checkbox" ${item.checked ? 'checked' : ''} data-id="${item.id}" />
+        <span class="checklist-item-text">${escapeHtml(item.text)}</span>
+        <button class="del-btn-small" data-id="${item.id}">Usuń</button>
+      `;
+      refs.items.appendChild(row);
+    });
+
+    refs.items.querySelectorAll('input[type="checkbox"]').forEach((cb) =>
+      cb.addEventListener('change', () => toggleShoppingItem(listName, cb.dataset.id))
+    );
+    refs.items.querySelectorAll('.del-btn-small').forEach((btn) =>
+      btn.addEventListener('click', () => deleteShoppingItem(listName, btn.dataset.id))
+    );
+  }
+
+  function addShoppingItem(listName) {
+    const refs = SHOPPING_LISTS[listName];
+    const text = refs.input.value.trim();
+    if (!text) return;
+    shoppingItems[listName].push({
+      id: 's' + Date.now() + Math.random().toString(36).slice(2, 7),
+      text,
+      checked: false,
+    });
+    refs.input.value = '';
+    renderShoppingList(listName);
+    saveShopping();
+  }
+
+  function toggleShoppingItem(listName, id) {
+    shoppingItems[listName] = shoppingItems[listName].map((i) =>
+      i.id === id ? { ...i, checked: !i.checked } : i
+    );
+    renderShoppingList(listName);
+    saveShopping();
+  }
+
+  function deleteShoppingItem(listName, id) {
+    shoppingItems[listName] = shoppingItems[listName].filter((i) => i.id !== id);
+    renderShoppingList(listName);
+    saveShopping();
+  }
+
+  shoppingAddOgolne.addEventListener('click', () => addShoppingItem('ogolne'));
+  shoppingAddComiesieczne.addEventListener('click', () => addShoppingItem('comiesieczne'));
+  shoppingInputOgolne.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addShoppingItem('ogolne');
+  });
+  shoppingInputComiesieczne.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addShoppingItem('comiesieczne');
+  });
+
+  shoppingTabOgolne.addEventListener('click', () => {
+    shoppingTabOgolne.classList.add('active');
+    shoppingTabComiesieczne.classList.remove('active');
+    shoppingListOgolne.classList.remove('hidden');
+    shoppingListComiesieczne.classList.add('hidden');
+  });
+
+  shoppingTabComiesieczne.addEventListener('click', () => {
+    shoppingTabComiesieczne.classList.add('active');
+    shoppingTabOgolne.classList.remove('active');
+    shoppingListComiesieczne.classList.remove('hidden');
+    shoppingListOgolne.classList.add('hidden');
+  });
+
   // ============================= SKŁADZIK (Pantry) =============================
 
   let editingPantryId = null;
+
+  const PANTRY_TYPE_LABELS = {
+    puszka: 'puszka/ki',
+    maka: 'mąka/ki',
+    makaron: 'makaron/ny',
+    butelka: 'butelka/ki',
+    sloik: 'słoik/ki',
+    paczka: 'paczka/ki',
+  };
 
   function pantryKey(name, unit) {
     return `${name.trim().toLowerCase()}|${(unit || '').trim().toLowerCase()}`;
@@ -781,6 +951,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     const sorted = [...pantryItems].sort((a, b) => a.name.localeCompare(b.name, 'pl'));
 
     sorted.forEach((item) => {
+      const typeLabel = PANTRY_TYPE_LABELS[item.type] || item.type || '';
       const row = document.createElement('div');
       row.className = 'payment-row';
       row.innerHTML = `
@@ -788,6 +959,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
           <div>
             <p class="payment-name">${escapeHtml(item.name)}</p>
             <p class="payment-detail">${item.amount}${item.unit ? ' ' + escapeHtml(item.unit) : ''}</p>
+            ${typeLabel ? `<span class="pantry-type-badge">${escapeHtml(typeLabel)}</span>` : ''}
           </div>
         </div>
         <div class="payment-actions">
@@ -812,29 +984,46 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   function renderPantryOverview() {
     pantryOverviewList.innerHTML = '';
-    const groups = {};
+
+    // Group first by type category, then by matching name+unit within each type.
+    const byType = {};
     pantryItems.forEach((item) => {
+      const type = item.type || 'inne';
+      if (!byType[type]) byType[type] = {};
       const key = pantryKey(item.name, item.unit);
-      if (!groups[key]) groups[key] = { name: item.name, unit: item.unit, total: 0, count: 0 };
-      groups[key].total += Number(item.amount) || 0;
-      groups[key].count += 1;
+      if (!byType[type][key]) byType[type][key] = { name: item.name, unit: item.unit, total: 0, count: 0 };
+      byType[type][key].total += Number(item.amount) || 0;
+      byType[type][key].count += 1;
     });
 
-    const groupList = Object.values(groups).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
-    pantryOverviewEmpty.classList.toggle('hidden', groupList.length !== 0);
+    const typeKeys = Object.keys(byType).sort((a, b) => {
+      const la = PANTRY_TYPE_LABELS[a] || a;
+      const lb = PANTRY_TYPE_LABELS[b] || b;
+      return la.localeCompare(lb, 'pl');
+    });
 
-    groupList.forEach((g) => {
-      const row = document.createElement('div');
-      row.className = 'payment-row';
-      row.innerHTML = `
-        <div class="payment-top">
-          <div>
-            <p class="payment-name">${escapeHtml(g.name)}</p>
-            <p class="payment-detail">Razem: ${g.total}${g.unit ? ' ' + escapeHtml(g.unit) : ''} · ${g.count} ${g.count === 1 ? 'wpis' : 'wpisy'}</p>
+    pantryOverviewEmpty.classList.toggle('hidden', typeKeys.length !== 0);
+
+    typeKeys.forEach((type) => {
+      const heading = document.createElement('p');
+      heading.className = 'pantry-group-heading';
+      heading.textContent = PANTRY_TYPE_LABELS[type] || type;
+      pantryOverviewList.appendChild(heading);
+
+      const groupList = Object.values(byType[type]).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+      groupList.forEach((g) => {
+        const row = document.createElement('div');
+        row.className = 'payment-row';
+        row.innerHTML = `
+          <div class="payment-top">
+            <div>
+              <p class="payment-name">${escapeHtml(g.name)}</p>
+              <p class="payment-detail">Razem: ${g.total}${g.unit ? ' ' + escapeHtml(g.unit) : ''} · ${g.count} ${g.count === 1 ? 'wpis' : 'wpisy'}</p>
+            </div>
           </div>
-        </div>
-      `;
-      pantryOverviewList.appendChild(row);
+        `;
+        pantryOverviewList.appendChild(row);
+      });
     });
   }
 
@@ -845,6 +1034,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     pName.value = item.name;
     pAmount.value = item.amount;
     pUnit.value = item.unit || '';
+    pType.value = item.type || 'puszka';
     pantryError.classList.add('hidden');
     pantryForm.classList.remove('hidden');
     pantrySave.textContent = 'Zapisz zmiany';
@@ -856,6 +1046,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     pName.value = '';
     pAmount.value = '';
     pUnit.value = '';
+    pType.value = 'puszka';
     pantryError.classList.add('hidden');
     pantrySave.textContent = 'Zapisz';
   }
@@ -882,6 +1073,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     const name = pName.value.trim();
     const amount = parseFloat(pAmount.value);
     const unit = pUnit.value.trim();
+    const type = pType.value;
 
     if (!name || isNaN(amount) || amount < 0) {
       pantryError.textContent = 'Podaj nazwę produktu i prawidłową ilość.';
@@ -891,13 +1083,14 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     pantryError.classList.add('hidden');
 
     if (editingPantryId) {
-      pantryItems = pantryItems.map((p) => (p.id === editingPantryId ? { ...p, name, amount, unit } : p));
+      pantryItems = pantryItems.map((p) => (p.id === editingPantryId ? { ...p, name, amount, unit, type } : p));
     } else {
       pantryItems.push({
         id: 'i' + Date.now() + Math.random().toString(36).slice(2, 7),
         name,
         amount,
         unit,
+        type,
       });
     }
 

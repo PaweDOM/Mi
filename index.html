@@ -28,6 +28,7 @@
 
     <div class="section-nav">
       <button id="nav-payments" class="section-tab active">Płatności</button>
+      <button id="nav-shopping" class="section-tab">Lista zakupów</button>
       <button id="nav-pantry" class="section-tab">Składzik</button>
       <button id="nav-trash" class="section-tab">Wywóz śmieci</button>
     </div>
@@ -108,6 +109,39 @@
       </div>
     </div>
 
+    <!-- ===================== LISTA ZAKUPÓW ===================== -->
+    <div id="section-shopping" class="section hidden">
+      <header>
+        <div>
+          <p class="label">Lista zakupów</p>
+          <p class="total" id="shopping-count">0</p>
+        </div>
+      </header>
+
+      <div class="tabs">
+        <button id="shopping-tab-ogolne" class="tab active">Ogólne</button>
+        <button id="shopping-tab-comiesieczne" class="tab">Co miesięczne</button>
+      </div>
+
+      <div id="shopping-list-ogolne" class="checklist-panel">
+        <div class="checklist-add-row">
+          <input type="text" id="shopping-input-ogolne" placeholder="Dodaj produkt…" />
+          <button id="shopping-add-ogolne" class="primary">Dodaj</button>
+        </div>
+        <div id="shopping-items-ogolne" class="checklist"></div>
+        <p id="shopping-empty-ogolne" class="empty hidden">Lista jest pusta.</p>
+      </div>
+
+      <div id="shopping-list-comiesieczne" class="checklist-panel hidden">
+        <div class="checklist-add-row">
+          <input type="text" id="shopping-input-comiesieczne" placeholder="Dodaj produkt…" />
+          <button id="shopping-add-comiesieczne" class="primary">Dodaj</button>
+        </div>
+        <div id="shopping-items-comiesieczne" class="checklist"></div>
+        <p id="shopping-empty-comiesieczne" class="empty hidden">Lista jest pusta.</p>
+      </div>
+    </div>
+
     <!-- ===================== SKŁADZIK ===================== -->
     <div id="section-pantry" class="section hidden">
       <header>
@@ -129,6 +163,15 @@
           <input type="number" id="p-amount" placeholder="Ilość" min="0" step="0.01" />
           <input type="text" id="p-unit" placeholder="Jednostka (np. kg, szt, opak.)" />
         </div>
+        <p class="inline-label" style="margin: 0 0 4px;">Typ</p>
+        <select id="p-type" class="select">
+          <option value="puszka">puszka/ki</option>
+          <option value="maka">mąka/ki</option>
+          <option value="makaron">makaron/ny</option>
+          <option value="butelka">butelka/ki</option>
+          <option value="sloik">słoik/ki</option>
+          <option value="paczka">paczka/ki</option>
+        </select>
         <p id="pantry-error" class="error hidden"></p>
         <div class="row end">
           <button id="pantry-cancel">Anuluj</button>

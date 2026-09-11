@@ -1,10 +1,13 @@
 # Zarządzanie domem (Household Management)
 
-An HTML/CSS/JS web app with three sections, sharing one login and one
+An HTML/CSS/JS web app with four sections, sharing one login and one
 Firebase backend:
 
 - **Płatności** (Payments) — recurring bill tracking with reminders
-- **Składzik** (Pantry) — simple home inventory with a totals overview
+- **Lista zakupów** (Shopping list) — two simple checklists, "Ogólne" and
+  "Co miesięczne"
+- **Składzik** (Pantry) — home inventory with type categories and a
+  totals overview
 - **Wywóz śmieci** (Trash collection) — a calendar of pickup dates with
   reminders the day before
 
@@ -31,14 +34,25 @@ Note: a monthly bill is due every month on its chosen day. A bi-monthly
 month you last changed its frequency) and recurs every 2 months from
 there.
 
+## Lista zakupów (Shopping list)
+
+- Two independent checklists: "Ogólne" (general) and "Co miesięczne"
+  (monthly recurring shopping)
+- Add an item, check it off, or delete it — simple to-do style
+- The header count shows how many unchecked items remain across both lists
+- No notifications for this section
+
 ## Składzik (Pantry)
 
-- Add items you have in storage: name, amount, and a free-text unit
-  (e.g. "kg", "szt", "opak.")
+- Add items you have in storage: name, amount, a free-text unit
+  (e.g. "kg", "szt", "opak."), and a type category
+- Type categories: puszka/ki (cans), mąka/ki (flour), makaron/ny (pasta),
+  butelka/ki (bottles), słoik/ki (jars), paczka/ki (packages)
 - Edit or delete any entry
-- "Total overview" tab groups entries by matching name + unit and shows
-  the summed total — e.g. if you've logged flour three separate times,
-  it shows one combined total rather than three separate lines
+- "Podsumowanie" (overview) tab groups entries first by type category,
+  then by matching name + unit within that type, showing a summed total —
+  e.g. if you've logged flour three separate times, it shows one combined
+  total under the "mąka/ki" heading rather than three separate lines
 - No notifications for this section (items don't have due dates)
 
 ## Wywóz śmieci (Trash collection)
@@ -90,7 +104,8 @@ one user, and reset its password from the console.
     "payments": { ".read": "auth != null", ".write": "auth != null" },
     "paidStatus": { ".read": "auth != null", ".write": "auth != null" },
     "pantry": { ".read": "auth != null", ".write": "auth != null" },
-    "trash": { ".read": "auth != null", ".write": "auth != null" }
+    "trash": { ".read": "auth != null", ".write": "auth != null" },
+    "shopping": { ".read": "auth != null", ".write": "auth != null" }
   }
 }
 ```

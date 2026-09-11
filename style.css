@@ -597,3 +597,88 @@ button.text-btn {
 .cal-pill.trash-bio { background: #6b4a2b; color: #fff; }
 .cal-pill.trash-zmieszane { background: #6b6b6b; color: #fff; }
 .cal-pill.trash-segregowane { background: #b89b1c; color: #fff; }
+
+/* --- Shopping checklist (Lista zakupów) --- */
+
+.checklist-panel.hidden {
+  display: none;
+}
+
+.checklist-add-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.checklist-add-row input[type="text"] {
+  flex: 1;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.checklist-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.checklist-item-text {
+  flex: 1;
+  font-size: 14px;
+}
+
+.checklist-item.checked .checklist-item-text {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.checklist-item .del-btn-small {
+  border: none;
+  background: none;
+  color: #a32d2d;
+  font-size: 12px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+/* --- Pantry type badge --- */
+
+.pantry-type-badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-top: 4px;
+  font-weight: 500;
+  background: #eef2ff;
+  color: #3a4a8c;
+}
+
+.pantry-group-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin: 16px 0 6px;
+}
+
+.pantry-group-heading:first-child {
+  margin-top: 0;
+}
