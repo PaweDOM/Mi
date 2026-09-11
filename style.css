@@ -634,24 +634,6 @@ button.text-btn {
   padding: 10px 12px;
 }
 
-.checklist-item.dragging {
-  opacity: 0.4;
-}
-
-.drag-handle {
-  cursor: grab;
-  touch-action: none;
-  color: #bbb;
-  font-size: 16px;
-  padding: 2px 4px;
-  flex-shrink: 0;
-  user-select: none;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
 .checklist-item input[type="checkbox"] {
   width: 18px;
   height: 18px;

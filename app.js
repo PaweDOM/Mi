@@ -865,7 +865,6 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     row.dataset.id = item.id;
     row.dataset.type = item.type || '';
     row.innerHTML = `
-      <span class="drag-handle" title="Przeciągnij, aby zmienić kolejność">⠿</span>
       <input type="checkbox" ${item.checked ? 'checked' : ''} data-id="${item.id}" />
       <span class="checklist-item-text">${escapeHtml(item.text)}</span>
       <div class="move-btns">
@@ -998,95 +997,6 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     renderShoppingList(listName);
     saveShopping();
   }
-
-  // --- Drag-and-drop reordering (mouse + touch, via Pointer Events) ---
-  // Dragging is scoped to items sharing the same "type" (empty string for
-  // "ogolne", since it has no types) — matching how the list is grouped.
-
-  function getDragAfterElement(container, y, draggingEl) {
-    const type = draggingEl.dataset.type || '';
-    const candidates = [...container.querySelectorAll('.checklist-item')].filter(
-      (el) => el !== draggingEl && (el.dataset.type || '') === type
-    );
-    return candidates.reduce(
-      (closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-          return { offset, element: child };
-        }
-        return closest;
-      },
-      { offset: -Infinity, element: null }
-    ).element;
-  }
-
-  function commitOrderFromDom(container, listName) {
-    const rows = [...container.querySelectorAll('.checklist-item')];
-    const typeCounters = {};
-    const updates = {};
-    rows.forEach((row) => {
-      const type = row.dataset.type || '';
-      if (typeCounters[type] === undefined) typeCounters[type] = 0;
-      updates[row.dataset.id] = typeCounters[type]++;
-    });
-    shoppingItems[listName] = shoppingItems[listName].map((i) => ({
-      ...i,
-      order: updates[i.id] !== undefined ? updates[i.id] : (i.order ?? 0),
-    }));
-    renderShoppingList(listName);
-    saveShopping();
-  }
-
-  function attachDragHandlers(container, listName) {
-    let draggingEl = null;
-
-    container.addEventListener('pointerdown', (e) => {
-      const handle = e.target.closest('.drag-handle');
-      if (!handle) return;
-      const row = handle.closest('.checklist-item');
-      if (!row) return;
-      e.preventDefault();
-
-      draggingEl = row;
-      row.classList.add('dragging');
-      handle.setPointerCapture(e.pointerId);
-
-      const onMove = (moveEvent) => {
-        if (!draggingEl) return;
-        const afterElement = getDragAfterElement(container, moveEvent.clientY, draggingEl);
-        if (afterElement == null) {
-          // Place at the end of same-type siblings, right before the next
-          // group's heading (if any) rather than at the very end of the DOM.
-          const type = draggingEl.dataset.type || '';
-          const sameType = [...container.querySelectorAll('.checklist-item')].filter(
-            (el) => (el.dataset.type || '') === type
-          );
-          const last = sameType[sameType.length - 1];
-          if (last && last !== draggingEl) {
-            last.after(draggingEl);
-          }
-        } else {
-          container.insertBefore(draggingEl, afterElement);
-        }
-      };
-
-      const onUp = (upEvent) => {
-        handle.releasePointerCapture(upEvent.pointerId);
-        handle.removeEventListener('pointermove', onMove);
-        handle.removeEventListener('pointerup', onUp);
-        row.classList.remove('dragging');
-        draggingEl = null;
-        commitOrderFromDom(container, listName);
-      };
-
-      handle.addEventListener('pointermove', onMove);
-      handle.addEventListener('pointerup', onUp);
-    });
-  }
-
-  attachDragHandlers(shoppingItemsOgolne, 'ogolne');
-  attachDragHandlers(shoppingItemsComiesieczne, 'comiesieczne');
 
   shoppingAddOgolne.addEventListener('click', () => addShoppingItem('ogolne'));
   shoppingAddComiesieczne.addEventListener('click', () => addShoppingItem('comiesieczne'));
