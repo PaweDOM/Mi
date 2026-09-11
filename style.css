@@ -634,6 +634,24 @@ button.text-btn {
   padding: 10px 12px;
 }
 
+.checklist-item.dragging {
+  opacity: 0.4;
+}
+
+.drag-handle {
+  cursor: grab;
+  touch-action: none;
+  color: #bbb;
+  font-size: 16px;
+  padding: 2px 4px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
 .checklist-item input[type="checkbox"] {
   width: 18px;
   height: 18px;
@@ -657,6 +675,42 @@ button.text-btn {
   font-size: 12px;
   padding: 4px 6px;
   cursor: pointer;
+}
+
+.checklist-item .move-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checklist-item .move-btn {
+  border: none;
+  background: none;
+  color: #888;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.checklist-item .move-btn:hover {
+  color: #111;
+}
+
+.checklist-item .move-btn:disabled {
+  color: #ddd;
+  cursor: default;
+}
+
+.checklist-group-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin: 16px 0 6px;
+}
+
+.checklist-group-heading:first-child {
+  margin-top: 0;
 }
 
 /* --- Pantry type badge --- */

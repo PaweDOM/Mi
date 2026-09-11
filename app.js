@@ -94,6 +94,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const shoppingInputComiesieczne = document.getElementById('shopping-input-comiesieczne');
   const shoppingAddOgolne = document.getElementById('shopping-add-ogolne');
   const shoppingAddComiesieczne = document.getElementById('shopping-add-comiesieczne');
+  const shoppingTypeComiesieczne = document.getElementById('shopping-type-comiesieczne');
   const shoppingItemsOgolne = document.getElementById('shopping-items-ogolne');
   const shoppingItemsComiesieczne = document.getElementById('shopping-items-comiesieczne');
   const shoppingEmptyOgolne = document.getElementById('shopping-empty-ogolne');
@@ -844,6 +845,53 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     },
   };
 
+  const SHOPPING_TYPE_LABELS = {
+    dom: 'Dom',
+    kaziczek: 'Kaziczek',
+    rosa: 'Rosa',
+    inne: 'Inne',
+  };
+  const SHOPPING_TYPE_ORDER = ['dom', 'kaziczek', 'rosa', 'inne'];
+
+  function nextShoppingOrder(listName) {
+    const items = shoppingItems[listName] || [];
+    if (items.length === 0) return 0;
+    return Math.max(...items.map((i) => i.order ?? 0)) + 1;
+  }
+
+  function renderChecklistRow(item) {
+    const row = document.createElement('div');
+    row.className = 'checklist-item' + (item.checked ? ' checked' : '');
+    row.dataset.id = item.id;
+    row.dataset.type = item.type || '';
+    row.innerHTML = `
+      <span class="drag-handle" title="Przeciągnij, aby zmienić kolejność">⠿</span>
+      <input type="checkbox" ${item.checked ? 'checked' : ''} data-id="${item.id}" />
+      <span class="checklist-item-text">${escapeHtml(item.text)}</span>
+      <div class="move-btns">
+        <button class="move-btn move-up-btn" data-id="${item.id}" title="Przenieś w górę">▲</button>
+        <button class="move-btn move-down-btn" data-id="${item.id}" title="Przenieś w dół">▼</button>
+      </div>
+      <button class="del-btn-small" data-id="${item.id}">Usuń</button>
+    `;
+    return row;
+  }
+
+  function wireChecklistRow(row, listName) {
+    row.querySelector('input[type="checkbox"]').addEventListener('change', (e) =>
+      toggleShoppingItem(listName, e.target.dataset.id)
+    );
+    row.querySelector('.del-btn-small').addEventListener('click', (e) =>
+      deleteShoppingItem(listName, e.target.dataset.id)
+    );
+    row.querySelector('.move-up-btn').addEventListener('click', (e) =>
+      moveShoppingItem(listName, e.target.dataset.id, -1)
+    );
+    row.querySelector('.move-down-btn').addEventListener('click', (e) =>
+      moveShoppingItem(listName, e.target.dataset.id, 1)
+    );
+  }
+
   function renderShoppingList(listName) {
     const refs = SHOPPING_LISTS[listName];
     const items = shoppingItems[listName] || [];
@@ -854,36 +902,53 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       shoppingItems.comiesieczne.filter((i) => !i.checked).length;
     shoppingCountEl.textContent = String(totalUnchecked);
 
-    const sorted = [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
+    if (listName === 'comiesieczne') {
+      // Grouped presentation by type, per the "selecting type" flow.
+      const byType = {};
+      items.forEach((item) => {
+        const type = item.type && SHOPPING_TYPE_LABELS[item.type] ? item.type : 'inne';
+        if (!byType[type]) byType[type] = [];
+        byType[type].push(item);
+      });
 
-    sorted.forEach((item) => {
-      const row = document.createElement('div');
-      row.className = 'checklist-item' + (item.checked ? ' checked' : '');
-      row.innerHTML = `
-        <input type="checkbox" ${item.checked ? 'checked' : ''} data-id="${item.id}" />
-        <span class="checklist-item-text">${escapeHtml(item.text)}</span>
-        <button class="del-btn-small" data-id="${item.id}">Usuń</button>
-      `;
-      refs.items.appendChild(row);
-    });
+      const typesPresent = SHOPPING_TYPE_ORDER.filter((t) => byType[t] && byType[t].length > 0);
+      typesPresent.forEach((type) => {
+        const heading = document.createElement('p');
+        heading.className = 'checklist-group-heading';
+        heading.textContent = SHOPPING_TYPE_LABELS[type];
+        refs.items.appendChild(heading);
 
-    refs.items.querySelectorAll('input[type="checkbox"]').forEach((cb) =>
-      cb.addEventListener('change', () => toggleShoppingItem(listName, cb.dataset.id))
-    );
-    refs.items.querySelectorAll('.del-btn-small').forEach((btn) =>
-      btn.addEventListener('click', () => deleteShoppingItem(listName, btn.dataset.id))
-    );
+        const groupSorted = [...byType[type]].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        groupSorted.forEach((item) => {
+          const row = renderChecklistRow(item);
+          wireChecklistRow(row, listName);
+          refs.items.appendChild(row);
+        });
+      });
+    } else {
+      const sorted = [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      sorted.forEach((item) => {
+        const row = renderChecklistRow(item);
+        wireChecklistRow(row, listName);
+        refs.items.appendChild(row);
+      });
+    }
   }
 
   function addShoppingItem(listName) {
     const refs = SHOPPING_LISTS[listName];
     const text = refs.input.value.trim();
     if (!text) return;
-    shoppingItems[listName].push({
+    const newItem = {
       id: 's' + Date.now() + Math.random().toString(36).slice(2, 7),
       text,
       checked: false,
-    });
+      order: nextShoppingOrder(listName),
+    };
+    if (listName === 'comiesieczne') {
+      newItem.type = shoppingTypeComiesieczne.value;
+    }
+    shoppingItems[listName].push(newItem);
     refs.input.value = '';
     renderShoppingList(listName);
     saveShopping();
@@ -902,6 +967,126 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     renderShoppingList(listName);
     saveShopping();
   }
+
+  // Moves an item up/down. For "comiesieczne", movement stays within the
+  // same type group, matching how the list is presented (grouped by type).
+  function moveShoppingItem(listName, id, direction) {
+    const items = shoppingItems[listName];
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+
+    const siblings = (listName === 'comiesieczne'
+      ? items.filter((i) => (i.type || 'inne') === (item.type || 'inne'))
+      : items
+    ).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    const idx = siblings.findIndex((i) => i.id === id);
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+
+    const a = siblings[idx];
+    const b = siblings[swapIdx];
+    const aOrder = a.order ?? 0;
+    const bOrder = b.order ?? 0;
+
+    shoppingItems[listName] = items.map((i) => {
+      if (i.id === a.id) return { ...i, order: bOrder };
+      if (i.id === b.id) return { ...i, order: aOrder };
+      return i;
+    });
+
+    renderShoppingList(listName);
+    saveShopping();
+  }
+
+  // --- Drag-and-drop reordering (mouse + touch, via Pointer Events) ---
+  // Dragging is scoped to items sharing the same "type" (empty string for
+  // "ogolne", since it has no types) — matching how the list is grouped.
+
+  function getDragAfterElement(container, y, draggingEl) {
+    const type = draggingEl.dataset.type || '';
+    const candidates = [...container.querySelectorAll('.checklist-item')].filter(
+      (el) => el !== draggingEl && (el.dataset.type || '') === type
+    );
+    return candidates.reduce(
+      (closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset, element: child };
+        }
+        return closest;
+      },
+      { offset: -Infinity, element: null }
+    ).element;
+  }
+
+  function commitOrderFromDom(container, listName) {
+    const rows = [...container.querySelectorAll('.checklist-item')];
+    const typeCounters = {};
+    const updates = {};
+    rows.forEach((row) => {
+      const type = row.dataset.type || '';
+      if (typeCounters[type] === undefined) typeCounters[type] = 0;
+      updates[row.dataset.id] = typeCounters[type]++;
+    });
+    shoppingItems[listName] = shoppingItems[listName].map((i) => ({
+      ...i,
+      order: updates[i.id] !== undefined ? updates[i.id] : (i.order ?? 0),
+    }));
+    renderShoppingList(listName);
+    saveShopping();
+  }
+
+  function attachDragHandlers(container, listName) {
+    let draggingEl = null;
+
+    container.addEventListener('pointerdown', (e) => {
+      const handle = e.target.closest('.drag-handle');
+      if (!handle) return;
+      const row = handle.closest('.checklist-item');
+      if (!row) return;
+      e.preventDefault();
+
+      draggingEl = row;
+      row.classList.add('dragging');
+      handle.setPointerCapture(e.pointerId);
+
+      const onMove = (moveEvent) => {
+        if (!draggingEl) return;
+        const afterElement = getDragAfterElement(container, moveEvent.clientY, draggingEl);
+        if (afterElement == null) {
+          // Place at the end of same-type siblings, right before the next
+          // group's heading (if any) rather than at the very end of the DOM.
+          const type = draggingEl.dataset.type || '';
+          const sameType = [...container.querySelectorAll('.checklist-item')].filter(
+            (el) => (el.dataset.type || '') === type
+          );
+          const last = sameType[sameType.length - 1];
+          if (last && last !== draggingEl) {
+            last.after(draggingEl);
+          }
+        } else {
+          container.insertBefore(draggingEl, afterElement);
+        }
+      };
+
+      const onUp = (upEvent) => {
+        handle.releasePointerCapture(upEvent.pointerId);
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        row.classList.remove('dragging');
+        draggingEl = null;
+        commitOrderFromDom(container, listName);
+      };
+
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+    });
+  }
+
+  attachDragHandlers(shoppingItemsOgolne, 'ogolne');
+  attachDragHandlers(shoppingItemsComiesieczne, 'comiesieczne');
 
   shoppingAddOgolne.addEventListener('click', () => addShoppingItem('ogolne'));
   shoppingAddComiesieczne.addEventListener('click', () => addShoppingItem('comiesieczne'));

@@ -38,7 +38,11 @@ there.
 
 - Two independent checklists: "Ogólne" (general) and "Co miesięczne"
   (monthly recurring shopping)
-- Add an item, check it off, or delete it — simple to-do style
+- Add an item, check it off, delete it, or reorder it — drag the ⠿ handle
+  with mouse or finger, or use the ▲/▼ buttons
+- "Co miesięczne" items also get a type: Dom, Kaziczek, Rosa, or Inne —
+  the list is presented grouped under those headings, and the ▲/▼ buttons
+  move an item within its own type group rather than the whole list
 - The header count shows how many unchecked items remain across both lists
 - No notifications for this section
 
