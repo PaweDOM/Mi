@@ -1,6 +1,6 @@
 {
-  "name": "Payment Reminders",
-  "short_name": "Payments",
+  "name": "Zarządzanie domem",
+  "short_name": "Dom",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#fafafa",

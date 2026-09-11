@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Payment Reminders</title>
+  <title>Zarządzanie domem</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
   <meta name="theme-color" content="#111111" />
@@ -11,89 +11,192 @@
 <body>
   <div id="login-screen" class="login-screen">
     <div class="login-box">
-      <p class="login-title">Payment Reminders</p>
-      <p class="login-sub">Enter the household password to continue.</p>
-      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" />
+      <p class="login-title">Zarządzanie domem</p>
+      <p class="login-sub">Wpisz hasło domowe, aby kontynuować.</p>
+      <input type="password" id="login-password" placeholder="Hasło" autocomplete="current-password" />
       <p id="login-error" class="error hidden"></p>
-      <button id="login-submit" class="primary" style="width:100%;">Log in</button>
+      <button id="login-submit" class="primary" style="width:100%;">Zaloguj się</button>
     </div>
   </div>
 
   <div class="app hidden" id="app-root">
-    <header>
-      <div>
-        <p class="label">Total monthly</p>
-        <p class="total" id="total">0,00 zł</p>
-      </div>
-      <button id="add-btn" class="primary">+ Add payment</button>
-    </header>
+    <div class="top-bar">
+      <p class="app-title">Zarządzanie domem</p>
+      <button id="logout-btn" class="text-btn" style="padding:0; font-size:12px;">Wyloguj się</button>
+    </div>
+    <p id="sync-status" class="sync-note">Łączenie…</p>
 
-    <p id="sync-status" class="sync-note">Connecting…</p>
-    <button id="logout-btn" class="text-btn" style="padding:0; margin: -12px 0 12px; font-size:12px;">Log out</button>
-
-    <div class="tabs">
-      <button id="tab-list" class="tab active">List</button>
-      <button id="tab-calendar" class="tab">Calendar</button>
+    <div class="section-nav">
+      <button id="nav-payments" class="section-tab active">Płatności</button>
+      <button id="nav-pantry" class="section-tab">Składzik</button>
+      <button id="nav-trash" class="section-tab">Wywóz śmieci</button>
     </div>
 
-    <p id="notif-banner" class="banner hidden">
-      Enable notifications to get reminded before bills are due.
-      <button id="notif-enable">Enable</button>
-      <button id="notif-dismiss" class="text-btn">Dismiss</button>
-    </p>
-
-    <div id="form" class="form hidden">
-      <input type="text" id="f-name" placeholder="Payment name (e.g. Rent, Netflix)" />
-      <input type="number" id="f-amount" placeholder="Amount" min="0" step="0.01" />
-      <input type="text" id="f-notes" placeholder="Account / company (e.g. mBank ...1234, PGE)" />
-
-      <div class="row">
-        <div style="flex:1;">
-          <p class="inline-label" style="margin: 0 0 4px;">Assigned to</p>
-          <select id="f-person" class="select">
-            <option value="Ogólne">Ogólne</option>
-            <option value="Paweł">Paweł</option>
-            <option value="Marta">Marta</option>
-          </select>
+    <!-- ===================== PŁATNOŚCI ===================== -->
+    <div id="section-payments" class="section">
+      <header>
+        <div>
+          <p class="label">Suma miesięczna</p>
+          <p class="total" id="total">0,00 zł</p>
         </div>
-        <div style="flex:1;">
-          <p class="inline-label" style="margin: 0 0 4px;">Frequency</p>
-          <select id="f-frequency" class="select">
-            <option value="1">Every month</option>
-            <option value="2">Every 2 months</option>
-          </select>
+        <button id="add-btn" class="primary">+ Dodaj płatność</button>
+      </header>
+
+      <div class="tabs">
+        <button id="tab-list" class="tab active">Lista</button>
+        <button id="tab-calendar" class="tab">Kalendarz</button>
+      </div>
+
+      <p id="notif-banner" class="banner hidden">
+        Włącz powiadomienia, aby otrzymywać przypomnienia przed terminem płatności.
+        <button id="notif-enable">Włącz</button>
+        <button id="notif-dismiss" class="text-btn">Odrzuć</button>
+      </p>
+
+      <div id="form" class="form hidden">
+        <input type="text" id="f-name" placeholder="Nazwa płatności (np. Czynsz, Netflix)" />
+        <input type="number" id="f-amount" placeholder="Kwota" min="0" step="0.01" />
+        <input type="text" id="f-notes" placeholder="Konto / firma (np. mBank ...1234, PGE)" />
+
+        <div class="row">
+          <div style="flex:1;">
+            <p class="inline-label" style="margin: 0 0 4px;">Przypisane do</p>
+            <select id="f-person" class="select">
+              <option value="Ogólne">Ogólne</option>
+              <option value="Paweł">Paweł</option>
+              <option value="Marta">Marta</option>
+            </select>
+          </div>
+          <div style="flex:1;">
+            <p class="inline-label" style="margin: 0 0 4px;">Częstotliwość</p>
+            <select id="f-frequency" class="select">
+              <option value="1">Co miesiąc</option>
+              <option value="2">Co 2 miesiące</option>
+            </select>
+          </div>
+        </div>
+
+        <p class="inline-label" style="margin: 0 0 -4px;">Dzień płatności w miesiącu</p>
+        <div id="day-picker" class="day-picker"></div>
+        <p class="picker-selected">Wybrany dzień: <span id="day-picker-selected">brak</span></p>
+
+        <div class="row">
+          <label for="f-lead" class="inline-label">Przypomnij mi tyle dni wcześniej:</label>
+          <input type="number" id="f-lead" placeholder="2" min="0" max="27" step="1" style="max-width: 70px;" />
+        </div>
+        <p id="f-error" class="error hidden"></p>
+        <div class="row end">
+          <button id="f-cancel">Anuluj</button>
+          <button id="f-save" class="primary">Zapisz</button>
         </div>
       </div>
 
-      <p class="inline-label" style="margin: 0 0 -4px;">Due day of month</p>
-      <div id="day-picker" class="day-picker"></div>
-      <p class="picker-selected">Selected day: <span id="day-picker-selected">none</span></p>
+      <div id="filter-chips" class="filter-chips"></div>
 
-      <div class="row">
-        <label for="f-lead" class="inline-label">Remind me this many days before:</label>
-        <input type="number" id="f-lead" placeholder="2" min="0" max="27" step="1" style="max-width: 70px;" />
+      <div id="list-view">
+        <div id="list" class="list"></div>
+        <p id="empty" class="empty hidden">Brak płatności. Dodaj pierwszą powyżej.</p>
       </div>
-      <p id="f-error" class="error hidden"></p>
-      <div class="row end">
-        <button id="f-cancel">Cancel</button>
-        <button id="f-save" class="primary">Save</button>
+
+      <div id="calendar-view" class="hidden">
+        <div class="cal-header">
+          <button id="cal-prev">&larr;</button>
+          <p id="cal-month-label" class="cal-month-label"></p>
+          <button id="cal-next">&rarr;</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
       </div>
     </div>
 
-    <div id="filter-chips" class="filter-chips"></div>
+    <!-- ===================== SKŁADZIK ===================== -->
+    <div id="section-pantry" class="section hidden">
+      <header>
+        <div>
+          <p class="label">Produkty w składziku</p>
+          <p class="total" id="pantry-count">0</p>
+        </div>
+        <button id="pantry-add-btn" class="primary">+ Dodaj produkt</button>
+      </header>
 
-    <div id="list-view">
-      <div id="list" class="list"></div>
-      <p id="empty" class="empty hidden">No payments yet. Add your first one above.</p>
+      <div class="tabs">
+        <button id="pantry-tab-list" class="tab active">Produkty</button>
+        <button id="pantry-tab-overview" class="tab">Podsumowanie</button>
+      </div>
+
+      <div id="pantry-form" class="form hidden">
+        <input type="text" id="p-name" placeholder="Nazwa produktu (np. Mąka pszenna, Makaron)" />
+        <div class="row">
+          <input type="number" id="p-amount" placeholder="Ilość" min="0" step="0.01" />
+          <input type="text" id="p-unit" placeholder="Jednostka (np. kg, szt, opak.)" />
+        </div>
+        <p id="pantry-error" class="error hidden"></p>
+        <div class="row end">
+          <button id="pantry-cancel">Anuluj</button>
+          <button id="pantry-save" class="primary">Zapisz</button>
+        </div>
+      </div>
+
+      <div id="pantry-list-view">
+        <div id="pantry-list" class="list"></div>
+        <p id="pantry-empty" class="empty hidden">Składzik jest pusty. Dodaj pierwszy produkt powyżej.</p>
+      </div>
+
+      <div id="pantry-overview-view" class="hidden">
+        <div id="pantry-overview-list" class="list"></div>
+        <p id="pantry-overview-empty" class="empty hidden">Brak danych do podsumowania.</p>
+      </div>
     </div>
 
-    <div id="calendar-view" class="hidden">
-      <div class="cal-header">
-        <button id="cal-prev">&larr;</button>
-        <p id="cal-month-label" class="cal-month-label"></p>
-        <button id="cal-next">&rarr;</button>
+    <!-- ===================== WYWÓZ ŚMIECI ===================== -->
+    <div id="section-trash" class="section hidden">
+      <header>
+        <div>
+          <p class="label">Najbliższy odbiór</p>
+          <p class="total" id="trash-next">—</p>
+        </div>
+        <button id="trash-add-btn" class="primary">+ Dodaj termin</button>
+      </header>
+
+      <div class="tabs">
+        <button id="trash-tab-list" class="tab active">Nadchodzące</button>
+        <button id="trash-tab-calendar" class="tab">Kalendarz</button>
       </div>
-      <div class="cal-grid" id="cal-grid"></div>
+
+      <p id="trash-notif-banner" class="banner hidden">
+        Włącz powiadomienia, aby otrzymać przypomnienie dzień przed odbiorem.
+        <button id="trash-notif-enable">Włącz</button>
+        <button id="trash-notif-dismiss" class="text-btn">Odrzuć</button>
+      </p>
+
+      <div id="trash-form" class="form hidden">
+        <p class="inline-label" style="margin: 0 0 4px;">Typ</p>
+        <div class="row" id="trash-type-picker">
+          <button type="button" class="trash-type-btn" data-type="bio">BIO</button>
+          <button type="button" class="trash-type-btn" data-type="zmieszane">Zmieszane</button>
+          <button type="button" class="trash-type-btn" data-type="segregowane">Segregowane</button>
+        </div>
+        <p class="inline-label" style="margin: 4px 0 4px;">Data</p>
+        <input type="date" id="trash-date" />
+        <p id="trash-error" class="error hidden"></p>
+        <div class="row end">
+          <button id="trash-cancel">Anuluj</button>
+          <button id="trash-save" class="primary">Zapisz</button>
+        </div>
+      </div>
+
+      <div id="trash-list-view">
+        <div id="trash-list" class="list"></div>
+        <p id="trash-empty" class="empty hidden">Nie dodano jeszcze żadnych terminów odbioru.</p>
+      </div>
+
+      <div id="trash-calendar-view" class="hidden">
+        <div class="cal-header">
+          <button id="trash-cal-prev">&larr;</button>
+          <p id="trash-cal-month-label" class="cal-month-label"></p>
+          <button id="trash-cal-next">&rarr;</button>
+        </div>
+        <div class="cal-grid" id="trash-cal-grid"></div>
+      </div>
     </div>
   </div>
 

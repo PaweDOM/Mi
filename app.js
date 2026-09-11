@@ -35,6 +35,8 @@ const db = getDatabase(firebaseApp);
 const auth = getAuth(firebaseApp);
 const paymentsRef = ref(db, "payments");
 const paidStatusRef = ref(db, "paidStatus");
+const pantryRef = ref(db, "pantry");
+const trashRef = ref(db, "trash");
 
 setPersistence(auth, browserLocalPersistence).catch((e) => {
   console.error('Failed to set auth persistence', e);
@@ -42,6 +44,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
 (function () {
   const NOTIFIED_KEY = 'payment-reminders:lastNotified';
+  const TRASH_NOTIFIED_KEY = 'payment-reminders:trashLastNotified';
   const BANNER_DISMISSED_KEY = 'payment-reminders:notifBannerDismissed';
 
   const listEl = document.getElementById('list');
@@ -70,6 +73,56 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const loginError = document.getElementById('login-error');
   const logoutBtn = document.getElementById('logout-btn');
 
+  // --- Section nav ---
+  const navPayments = document.getElementById('nav-payments');
+  const navPantry = document.getElementById('nav-pantry');
+  const navTrash = document.getElementById('nav-trash');
+  const sectionPayments = document.getElementById('section-payments');
+  const sectionPantry = document.getElementById('section-pantry');
+  const sectionTrash = document.getElementById('section-trash');
+
+  // --- Pantry (Składzik) elements ---
+  const pantryListEl = document.getElementById('pantry-list');
+  const pantryEmptyEl = document.getElementById('pantry-empty');
+  const pantryCountEl = document.getElementById('pantry-count');
+  const pantryForm = document.getElementById('pantry-form');
+  const pantryAddBtn = document.getElementById('pantry-add-btn');
+  const pName = document.getElementById('p-name');
+  const pAmount = document.getElementById('p-amount');
+  const pUnit = document.getElementById('p-unit');
+  const pantryError = document.getElementById('pantry-error');
+  const pantrySave = document.getElementById('pantry-save');
+  const pantryCancel = document.getElementById('pantry-cancel');
+  const pantryTabList = document.getElementById('pantry-tab-list');
+  const pantryTabOverview = document.getElementById('pantry-tab-overview');
+  const pantryListView = document.getElementById('pantry-list-view');
+  const pantryOverviewView = document.getElementById('pantry-overview-view');
+  const pantryOverviewList = document.getElementById('pantry-overview-list');
+  const pantryOverviewEmpty = document.getElementById('pantry-overview-empty');
+
+  // --- Trash (Wywóz śmieci) elements ---
+  const trashListEl = document.getElementById('trash-list');
+  const trashEmptyEl = document.getElementById('trash-empty');
+  const trashNextEl = document.getElementById('trash-next');
+  const trashForm = document.getElementById('trash-form');
+  const trashAddBtn = document.getElementById('trash-add-btn');
+  const trashDateInput = document.getElementById('trash-date');
+  const trashError = document.getElementById('trash-error');
+  const trashSave = document.getElementById('trash-save');
+  const trashCancel = document.getElementById('trash-cancel');
+  const trashTypePicker = document.getElementById('trash-type-picker');
+  const trashTabList = document.getElementById('trash-tab-list');
+  const trashTabCalendar = document.getElementById('trash-tab-calendar');
+  const trashListView = document.getElementById('trash-list-view');
+  const trashCalendarView = document.getElementById('trash-calendar-view');
+  const trashCalGrid = document.getElementById('trash-cal-grid');
+  const trashCalMonthLabel = document.getElementById('trash-cal-month-label');
+  const trashCalPrev = document.getElementById('trash-cal-prev');
+  const trashCalNext = document.getElementById('trash-cal-next');
+  const trashNotifBanner = document.getElementById('trash-notif-banner');
+  const trashNotifEnable = document.getElementById('trash-notif-enable');
+  const trashNotifDismiss = document.getElementById('trash-notif-dismiss');
+
   const PEOPLE = ['Paweł', 'Marta', 'Ogólne'];
   let activeFilter = 'All';
 
@@ -87,9 +140,30 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   let payments = [];
   let paidStatus = {};
   let lastNotified = {};
+  let trashLastNotified = {};
   let editingId = null;
   let selectedDay = null;
   let calCursor = new Date(); // month currently shown in the calendar view
+
+  // --- Section nav (Płatności / Składzik / Wywóz śmieci) ---
+
+  function showSection(name) {
+    sectionPayments.classList.toggle('hidden', name !== 'payments');
+    sectionPantry.classList.toggle('hidden', name !== 'pantry');
+    sectionTrash.classList.toggle('hidden', name !== 'trash');
+    navPayments.classList.toggle('active', name === 'payments');
+    navPantry.classList.toggle('active', name === 'pantry');
+    navTrash.classList.toggle('active', name === 'trash');
+    if (name === 'pantry') renderPantry();
+    if (name === 'trash') {
+      renderTrashList();
+      if (!trashCalendarView.classList.contains('hidden')) renderTrashCalendar();
+    }
+  }
+
+  navPayments.addEventListener('click', () => showSection('payments'));
+  navPantry.addEventListener('click', () => showSection('pantry'));
+  navTrash.addEventListener('click', () => showSection('trash'));
 
   function monthKey(date = new Date()) {
     return `${date.getFullYear()}-${date.getMonth() + 1}`;
@@ -171,12 +245,15 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     return obj ? Object.values(obj) : [];
   }
 
-  let firebaseReady = { payments: false, paidStatus: false };
+  let pantryItems = [];
+  let trashDates = [];
+
+  let firebaseReady = { payments: false, paidStatus: false, pantry: false, trash: false };
   let listenersAttached = false;
 
   function markConnected() {
-    if (firebaseReady.payments && firebaseReady.paidStatus) {
-      syncStatusEl.textContent = 'Live — synced with anyone who has this site open';
+    if (firebaseReady.payments && firebaseReady.paidStatus && firebaseReady.pantry && firebaseReady.trash) {
+      syncStatusEl.textContent = 'Na żywo — zsynchronizowane z każdym, kto ma otwartą tę stronę';
       syncStatusEl.className = 'sync-note live';
     }
   }
@@ -184,6 +261,38 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   function attachDataListeners() {
     if (listenersAttached) return;
     listenersAttached = true;
+
+    onValue(
+      pantryRef,
+      (snapshot) => {
+        pantryItems = objToArray(snapshot.val());
+        firebaseReady.pantry = true;
+        markConnected();
+        if (!sectionPantry.classList.contains('hidden')) renderPantry();
+      },
+      (error) => {
+        console.error('Firebase pantry read failed', error);
+        syncStatusEl.textContent = 'Nie można połączyć się z pamięcią współdzieloną — sprawdź połączenie.';
+        syncStatusEl.className = 'sync-note error';
+      }
+    );
+
+    onValue(
+      trashRef,
+      (snapshot) => {
+        trashDates = objToArray(snapshot.val());
+        firebaseReady.trash = true;
+        markConnected();
+        renderTrashList();
+        if (!trashCalendarView.classList.contains('hidden')) renderTrashCalendar();
+        checkTrashNotify();
+      },
+      (error) => {
+        console.error('Firebase trash read failed', error);
+        syncStatusEl.textContent = 'Nie można połączyć się z pamięcią współdzieloną — sprawdź połączenie.';
+        syncStatusEl.className = 'sync-note error';
+      }
+    );
 
     onValue(
       paymentsRef,
@@ -197,7 +306,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       },
       (error) => {
         console.error('Firebase payments read failed', error);
-        syncStatusEl.textContent = 'Could not connect to shared storage — check your connection.';
+        syncStatusEl.textContent = 'Nie można połączyć się z pamięcią współdzieloną — sprawdź połączenie.';
         syncStatusEl.className = 'sync-note error';
       }
     );
@@ -213,7 +322,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       },
       (error) => {
         console.error('Firebase paidStatus read failed', error);
-        syncStatusEl.textContent = 'Could not connect to shared storage — check your connection.';
+        syncStatusEl.textContent = 'Nie można połączyć się z pamięcią współdzieloną — sprawdź połączenie.';
         syncStatusEl.className = 'sync-note error';
       }
     );
@@ -224,7 +333,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       await dbSet(paymentsRef, paymentsToObj(payments));
     } catch (e) {
       console.error('Failed to save payments', e);
-      syncStatusEl.textContent = 'Save failed — check your connection and try again.';
+      syncStatusEl.textContent = 'Zapis nie powiódł się — sprawdź połączenie i spróbuj ponownie.';
       syncStatusEl.className = 'sync-note error';
     }
   }
@@ -234,7 +343,27 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       await dbSet(paidStatusRef, paidStatus);
     } catch (e) {
       console.error('Failed to save paid status', e);
-      syncStatusEl.textContent = 'Save failed — check your connection and try again.';
+      syncStatusEl.textContent = 'Zapis nie powiódł się — sprawdź połączenie i spróbuj ponownie.';
+      syncStatusEl.className = 'sync-note error';
+    }
+  }
+
+  async function savePantry() {
+    try {
+      await dbSet(pantryRef, paymentsToObj(pantryItems));
+    } catch (e) {
+      console.error('Failed to save pantry', e);
+      syncStatusEl.textContent = 'Zapis nie powiódł się — sprawdź połączenie i spróbuj ponownie.';
+      syncStatusEl.className = 'sync-note error';
+    }
+  }
+
+  async function saveTrash() {
+    try {
+      await dbSet(trashRef, paymentsToObj(trashDates));
+    } catch (e) {
+      console.error('Failed to save trash dates', e);
+      syncStatusEl.textContent = 'Zapis nie powiódł się — sprawdź połączenie i spróbuj ponownie.';
       syncStatusEl.className = 'sync-note error';
     }
   }
@@ -245,10 +374,19 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     } catch (e) {
       lastNotified = {};
     }
+    try {
+      trashLastNotified = JSON.parse(localStorage.getItem(TRASH_NOTIFIED_KEY) || '{}');
+    } catch (e) {
+      trashLastNotified = {};
+    }
   }
 
   function saveLastNotified() {
     localStorage.setItem(NOTIFIED_KEY, JSON.stringify(lastNotified));
+  }
+
+  function saveTrashLastNotified() {
+    localStorage.setItem(TRASH_NOTIFIED_KEY, JSON.stringify(trashLastNotified));
   }
 
   // --- Day picker (grid of 1-31 for choosing a due day) ---
@@ -281,7 +419,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'chip' + (activeFilter === label ? ' active' : '');
-      chip.textContent = label;
+      chip.textContent = label === 'All' ? 'Wszystkie' : label;
       chip.addEventListener('click', () => {
         activeFilter = label;
         buildFilterChips();
@@ -322,13 +460,13 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   function renderCalendar() {
     const year = calCursor.getFullYear();
     const month = calCursor.getMonth();
-    calMonthLabel.textContent = calCursor.toLocaleDateString(undefined, {
+    calMonthLabel.textContent = calCursor.toLocaleDateString('pl-PL', {
       month: 'long',
       year: 'numeric',
     });
 
     calGrid.innerHTML = '';
-    const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dowNames = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So'];
     dowNames.forEach((name) => {
       const el = document.createElement('div');
       el.className = 'cal-dow';
@@ -426,7 +564,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       const notifKey = `${paidKey}:notified`;
 
       if (d <= leadTime && lastNotified[notifKey] !== todayStr) {
-        const label = d <= 0 ? (d === 0 ? 'is due today' : 'is overdue') : `is due in ${d} day${d === 1 ? '' : 's'}`;
+        const label = d <= 0 ? (d === 0 ? 'termin dziś' : 'zaległa płatność') : `termin za ${d} ${d === 1 ? 'dzień' : 'dni'}`;
         new Notification(p.name, { body: `${fmt(p.amount)} ${label}.` });
         lastNotified[notifKey] = todayStr;
         changed = true;
@@ -440,11 +578,11 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   function statusFor(payment) {
     const key = occurrenceKey(payment);
-    if (paidStatus[key]) return { label: 'Paid', cls: 'success' };
+    if (paidStatus[key]) return { label: 'Opłacone', cls: 'success' };
     const d = daysUntilPayment(payment);
-    if (d <= 0) return { label: d === 0 ? 'Due today' : 'Overdue', cls: 'danger' };
-    if (d <= (payment.daysBefore ?? 5)) return { label: `Due in ${d} day${d === 1 ? '' : 's'}`, cls: 'warning' };
-    return { label: `Due in ${d} days`, cls: 'muted' };
+    if (d <= 0) return { label: d === 0 ? 'Termin dziś' : 'Zaległe', cls: 'danger' };
+    if (d <= (payment.daysBefore ?? 5)) return { label: `Termin za ${d} ${d === 1 ? 'dzień' : 'dni'}`, cls: 'warning' };
+    return { label: `Termin za ${d} dni`, cls: 'muted' };
   }
 
   function render() {
@@ -460,7 +598,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       const st = statusFor(p);
       const isPaid = st.cls === 'success';
       const person = p.person || 'Ogólne';
-      const freqLabel = (p.frequency || 1) > 1 ? `every ${p.frequency} months` : 'monthly';
+      const freqLabel = (p.frequency || 1) > 1 ? `co ${p.frequency} miesiące` : 'co miesiąc';
 
       const row = document.createElement('div');
       row.className = 'payment-row';
@@ -468,7 +606,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
         <div class="payment-top">
           <div>
             <p class="payment-name">${escapeHtml(p.name)}</p>
-            <p class="payment-detail">${fmt(p.amount)} · due day ${p.day} · ${freqLabel}</p>
+            <p class="payment-detail">${fmt(p.amount)} · dzień ${p.day} · ${freqLabel}</p>
             ${p.notes ? `<p class="payment-notes">${escapeHtml(p.notes)}</p>` : ''}
             <span class="person-tag ${personTagClass(person)}">${escapeHtml(person)}</span>
           </div>
@@ -476,10 +614,10 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
         </div>
         <div class="payment-actions">
           <div class="action-btns">
-            <button class="edit-btn" data-id="${p.id}">Edit</button>
-            <button class="del-btn" data-id="${p.id}">Delete</button>
+            <button class="edit-btn" data-id="${p.id}">Edytuj</button>
+            <button class="del-btn" data-id="${p.id}">Usuń</button>
           </div>
-          <button class="pay-btn" data-id="${p.id}">${isPaid ? 'Mark unpaid' : 'Mark paid'}</button>
+          <button class="pay-btn" data-id="${p.id}">${isPaid ? 'Oznacz jako nieopłacone' : 'Oznacz jako opłacone'}</button>
         </div>
       `;
       listEl.appendChild(row);
@@ -528,7 +666,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     fLead.value = p.daysBefore ?? 2;
     fError.classList.add('hidden');
     form.classList.remove('hidden');
-    fSave.textContent = 'Save changes';
+    fSave.textContent = 'Zapisz zmiany';
     fName.focus();
   }
 
@@ -540,11 +678,11 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     fPerson.value = 'Ogólne';
     fFrequency.value = '1';
     selectedDay = null;
-    dayPickerSelected.textContent = 'none';
+    dayPickerSelected.textContent = 'brak';
     dayPicker.querySelectorAll('button').forEach((btn) => btn.classList.remove('selected'));
     fLead.value = '2';
     fError.classList.add('hidden');
-    fSave.textContent = 'Save';
+    fSave.textContent = 'Zapisz';
   }
 
   addBtn.addEventListener('click', () => {
@@ -569,7 +707,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     const frequency = parseInt(fFrequency.value, 10) || 1;
 
     if (!name || isNaN(amount) || amount < 0 || !day) {
-      fError.textContent = 'Enter a name, a valid amount, and pick a due day on the calendar above.';
+      fError.textContent = 'Podaj nazwę, prawidłową kwotę i wybierz dzień płatności powyżej.';
       fError.classList.remove('hidden');
       return;
     }
@@ -618,8 +756,446 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     if (document.visibilityState === 'visible') {
       render();
       checkAndNotify();
+      if (!sectionPantry.classList.contains('hidden')) renderPantry();
+      if (!sectionTrash.classList.contains('hidden')) {
+        renderTrashList();
+        if (!trashCalendarView.classList.contains('hidden')) renderTrashCalendar();
+      }
+      checkTrashNotify();
     }
   });
+
+  // ============================= SKŁADZIK (Pantry) =============================
+
+  let editingPantryId = null;
+
+  function pantryKey(name, unit) {
+    return `${name.trim().toLowerCase()}|${(unit || '').trim().toLowerCase()}`;
+  }
+
+  function renderPantry() {
+    pantryListEl.innerHTML = '';
+    pantryCountEl.textContent = String(pantryItems.length);
+    pantryEmptyEl.classList.toggle('hidden', pantryItems.length !== 0);
+
+    const sorted = [...pantryItems].sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+
+    sorted.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'payment-row';
+      row.innerHTML = `
+        <div class="payment-top">
+          <div>
+            <p class="payment-name">${escapeHtml(item.name)}</p>
+            <p class="payment-detail">${item.amount}${item.unit ? ' ' + escapeHtml(item.unit) : ''}</p>
+          </div>
+        </div>
+        <div class="payment-actions">
+          <div class="action-btns">
+            <button class="pantry-edit-btn" data-id="${item.id}">Edytuj</button>
+            <button class="pantry-del-btn" data-id="${item.id}">Usuń</button>
+          </div>
+        </div>
+      `;
+      pantryListEl.appendChild(row);
+    });
+
+    pantryListEl.querySelectorAll('.pantry-edit-btn').forEach((btn) =>
+      btn.addEventListener('click', () => editPantryItem(btn.dataset.id))
+    );
+    pantryListEl.querySelectorAll('.pantry-del-btn').forEach((btn) =>
+      btn.addEventListener('click', () => deletePantryItem(btn.dataset.id))
+    );
+
+    renderPantryOverview();
+  }
+
+  function renderPantryOverview() {
+    pantryOverviewList.innerHTML = '';
+    const groups = {};
+    pantryItems.forEach((item) => {
+      const key = pantryKey(item.name, item.unit);
+      if (!groups[key]) groups[key] = { name: item.name, unit: item.unit, total: 0, count: 0 };
+      groups[key].total += Number(item.amount) || 0;
+      groups[key].count += 1;
+    });
+
+    const groupList = Object.values(groups).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+    pantryOverviewEmpty.classList.toggle('hidden', groupList.length !== 0);
+
+    groupList.forEach((g) => {
+      const row = document.createElement('div');
+      row.className = 'payment-row';
+      row.innerHTML = `
+        <div class="payment-top">
+          <div>
+            <p class="payment-name">${escapeHtml(g.name)}</p>
+            <p class="payment-detail">Razem: ${g.total}${g.unit ? ' ' + escapeHtml(g.unit) : ''} · ${g.count} ${g.count === 1 ? 'wpis' : 'wpisy'}</p>
+          </div>
+        </div>
+      `;
+      pantryOverviewList.appendChild(row);
+    });
+  }
+
+  function editPantryItem(id) {
+    const item = pantryItems.find((x) => x.id === id);
+    if (!item) return;
+    editingPantryId = id;
+    pName.value = item.name;
+    pAmount.value = item.amount;
+    pUnit.value = item.unit || '';
+    pantryError.classList.add('hidden');
+    pantryForm.classList.remove('hidden');
+    pantrySave.textContent = 'Zapisz zmiany';
+    pName.focus();
+  }
+
+  function resetPantryForm() {
+    editingPantryId = null;
+    pName.value = '';
+    pAmount.value = '';
+    pUnit.value = '';
+    pantryError.classList.add('hidden');
+    pantrySave.textContent = 'Zapisz';
+  }
+
+  function deletePantryItem(id) {
+    pantryItems = pantryItems.filter((p) => p.id !== id);
+    renderPantry();
+    savePantry();
+  }
+
+  pantryAddBtn.addEventListener('click', () => {
+    const willShow = pantryForm.classList.contains('hidden');
+    if (willShow) resetPantryForm();
+    pantryForm.classList.toggle('hidden');
+    if (willShow) pName.focus();
+  });
+
+  pantryCancel.addEventListener('click', () => {
+    pantryForm.classList.add('hidden');
+    resetPantryForm();
+  });
+
+  pantrySave.addEventListener('click', () => {
+    const name = pName.value.trim();
+    const amount = parseFloat(pAmount.value);
+    const unit = pUnit.value.trim();
+
+    if (!name || isNaN(amount) || amount < 0) {
+      pantryError.textContent = 'Podaj nazwę produktu i prawidłową ilość.';
+      pantryError.classList.remove('hidden');
+      return;
+    }
+    pantryError.classList.add('hidden');
+
+    if (editingPantryId) {
+      pantryItems = pantryItems.map((p) => (p.id === editingPantryId ? { ...p, name, amount, unit } : p));
+    } else {
+      pantryItems.push({
+        id: 'i' + Date.now() + Math.random().toString(36).slice(2, 7),
+        name,
+        amount,
+        unit,
+      });
+    }
+
+    pantryForm.classList.add('hidden');
+    resetPantryForm();
+    renderPantry();
+    savePantry();
+  });
+
+  pantryTabList.addEventListener('click', () => {
+    pantryTabList.classList.add('active');
+    pantryTabOverview.classList.remove('active');
+    pantryListView.classList.remove('hidden');
+    pantryOverviewView.classList.add('hidden');
+  });
+
+  pantryTabOverview.addEventListener('click', () => {
+    pantryTabOverview.classList.add('active');
+    pantryTabList.classList.remove('active');
+    pantryOverviewView.classList.remove('hidden');
+    pantryListView.classList.add('hidden');
+    renderPantryOverview();
+  });
+
+  // ============================= WYWÓZ ŚMIECI (Trash) =============================
+
+  const TRASH_TYPES = {
+    bio: { label: 'BIO', cls: 'bio' },
+    zmieszane: { label: 'Zmieszane', cls: 'zmieszane' },
+    segregowane: { label: 'Segregowane', cls: 'segregowane' },
+  };
+
+  let editingTrashId = null;
+  let selectedTrashType = null;
+  let trashCalCursor = new Date();
+
+  function dateOnly(d) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function parseIsoDate(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function daysUntilDate(iso) {
+    const today = dateOnly(new Date());
+    const target = parseIsoDate(iso);
+    return Math.round((target - today) / 86400000);
+  }
+
+  function buildTrashTypePicker() {
+    trashTypePicker.querySelectorAll('.trash-type-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        selectedTrashType = btn.dataset.type;
+        trashTypePicker.querySelectorAll('.trash-type-btn').forEach((b) =>
+          b.classList.toggle('selected', b.dataset.type === selectedTrashType)
+        );
+      });
+    });
+  }
+
+  function upcomingTrashDates() {
+    return trashDates.filter((t) => daysUntilDate(t.date) >= 0).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  function renderTrashList() {
+    trashListEl.innerHTML = '';
+    const upcoming = upcomingTrashDates();
+    trashEmptyEl.classList.toggle('hidden', trashDates.length !== 0);
+
+    if (upcoming.length > 0) {
+      const next = upcoming[0];
+      const d = daysUntilDate(next.date);
+      const label = d === 0 ? 'dziś' : d === 1 ? 'jutro' : `za ${d} dni`;
+      trashNextEl.textContent = `${TRASH_TYPES[next.type]?.label || next.type} — ${label}`;
+    } else {
+      trashNextEl.textContent = '—';
+    }
+
+    const allSorted = [...trashDates].sort((a, b) => a.date.localeCompare(b.date));
+
+    allSorted.forEach((t) => {
+      const d = daysUntilDate(t.date);
+      const isPast = d < 0;
+      const dateObj = parseIsoDate(t.date);
+      const dateLabel = dateObj.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+      const typeInfo = TRASH_TYPES[t.type] || { label: t.type, cls: '' };
+
+      const row = document.createElement('div');
+      row.className = 'payment-row';
+      row.style.opacity = isPast ? '0.5' : '1';
+      row.innerHTML = `
+        <div class="payment-top">
+          <div>
+            <p class="payment-name">${dateLabel}</p>
+            <span class="trash-badge ${typeInfo.cls}">${typeInfo.label}</span>
+          </div>
+        </div>
+        <div class="payment-actions">
+          <div class="action-btns">
+            <button class="trash-edit-btn" data-id="${t.id}">Edytuj</button>
+            <button class="trash-del-btn" data-id="${t.id}">Usuń</button>
+          </div>
+        </div>
+      `;
+      trashListEl.appendChild(row);
+    });
+
+    trashListEl.querySelectorAll('.trash-edit-btn').forEach((btn) =>
+      btn.addEventListener('click', () => editTrashDate(btn.dataset.id))
+    );
+    trashListEl.querySelectorAll('.trash-del-btn').forEach((btn) =>
+      btn.addEventListener('click', () => deleteTrashDate(btn.dataset.id))
+    );
+  }
+
+  function renderTrashCalendar() {
+    const year = trashCalCursor.getFullYear();
+    const month = trashCalCursor.getMonth();
+    trashCalMonthLabel.textContent = trashCalCursor.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+
+    trashCalGrid.innerHTML = '';
+    const dowNames = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So'];
+    dowNames.forEach((name) => {
+      const el = document.createElement('div');
+      el.className = 'cal-dow';
+      el.textContent = name;
+      trashCalGrid.appendChild(el);
+    });
+
+    const firstDow = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+
+    for (let i = 0; i < firstDow; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell empty';
+      trashCalGrid.appendChild(cell);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      if (isCurrentMonth && today.getDate() === day) cell.classList.add('today');
+
+      const dateEl = document.createElement('p');
+      dateEl.className = 'cal-date';
+      dateEl.textContent = day;
+      cell.appendChild(dateEl);
+
+      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      trashDates
+        .filter((t) => t.date === iso)
+        .forEach((t) => {
+          const typeInfo = TRASH_TYPES[t.type] || { label: t.type, cls: '' };
+          const pill = document.createElement('span');
+          pill.className = `cal-pill trash-${typeInfo.cls}`;
+          pill.textContent = typeInfo.label;
+          cell.appendChild(pill);
+        });
+
+      trashCalGrid.appendChild(cell);
+    }
+  }
+
+  trashCalPrev.addEventListener('click', () => {
+    trashCalCursor = new Date(trashCalCursor.getFullYear(), trashCalCursor.getMonth() - 1, 1);
+    renderTrashCalendar();
+  });
+  trashCalNext.addEventListener('click', () => {
+    trashCalCursor = new Date(trashCalCursor.getFullYear(), trashCalCursor.getMonth() + 1, 1);
+    renderTrashCalendar();
+  });
+
+  function editTrashDate(id) {
+    const t = trashDates.find((x) => x.id === id);
+    if (!t) return;
+    editingTrashId = id;
+    selectedTrashType = t.type;
+    trashTypePicker.querySelectorAll('.trash-type-btn').forEach((b) =>
+      b.classList.toggle('selected', b.dataset.type === t.type)
+    );
+    trashDateInput.value = t.date;
+    trashError.classList.add('hidden');
+    trashForm.classList.remove('hidden');
+    trashSave.textContent = 'Zapisz zmiany';
+  }
+
+  function resetTrashForm() {
+    editingTrashId = null;
+    selectedTrashType = null;
+    trashTypePicker.querySelectorAll('.trash-type-btn').forEach((b) => b.classList.remove('selected'));
+    trashDateInput.value = '';
+    trashError.classList.add('hidden');
+    trashSave.textContent = 'Zapisz';
+  }
+
+  function deleteTrashDate(id) {
+    trashDates = trashDates.filter((t) => t.id !== id);
+    renderTrashList();
+    if (!trashCalendarView.classList.contains('hidden')) renderTrashCalendar();
+    saveTrash();
+  }
+
+  trashAddBtn.addEventListener('click', () => {
+    const willShow = trashForm.classList.contains('hidden');
+    if (willShow) resetTrashForm();
+    trashForm.classList.toggle('hidden');
+  });
+
+  trashCancel.addEventListener('click', () => {
+    trashForm.classList.add('hidden');
+    resetTrashForm();
+  });
+
+  trashSave.addEventListener('click', () => {
+    const type = selectedTrashType;
+    const date = trashDateInput.value;
+
+    if (!type || !date) {
+      trashError.textContent = 'Wybierz typ i datę.';
+      trashError.classList.remove('hidden');
+      return;
+    }
+    trashError.classList.add('hidden');
+
+    if (editingTrashId) {
+      trashDates = trashDates.map((t) => (t.id === editingTrashId ? { ...t, type, date } : t));
+    } else {
+      trashDates.push({
+        id: 't' + Date.now() + Math.random().toString(36).slice(2, 7),
+        type,
+        date,
+      });
+    }
+
+    trashForm.classList.add('hidden');
+    resetTrashForm();
+    renderTrashList();
+    if (!trashCalendarView.classList.contains('hidden')) renderTrashCalendar();
+    saveTrash();
+    checkTrashNotify();
+  });
+
+  trashTabList.addEventListener('click', () => {
+    trashTabList.classList.add('active');
+    trashTabCalendar.classList.remove('active');
+    trashListView.classList.remove('hidden');
+    trashCalendarView.classList.add('hidden');
+  });
+
+  trashTabCalendar.addEventListener('click', () => {
+    trashTabCalendar.classList.add('active');
+    trashTabList.classList.remove('active');
+    trashCalendarView.classList.remove('hidden');
+    trashListView.classList.add('hidden');
+    renderTrashCalendar();
+  });
+
+  async function updateTrashNotifBanner() {
+    const dismissed = localStorage.getItem('payment-reminders:trashBannerDismissed') === '1';
+    const supported = 'Notification' in window;
+    const show = supported && Notification.permission === 'default' && !dismissed;
+    trashNotifBanner.classList.toggle('hidden', !show);
+  }
+
+  trashNotifEnable.addEventListener('click', async () => {
+    if (!('Notification' in window)) return;
+    await Notification.requestPermission();
+    updateNotifBanner();
+    updateTrashNotifBanner();
+  });
+
+  trashNotifDismiss.addEventListener('click', () => {
+    localStorage.setItem('payment-reminders:trashBannerDismissed', '1');
+    updateTrashNotifBanner();
+  });
+
+  function checkTrashNotify() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const todayStr = new Date().toDateString();
+    let changed = false;
+
+    trashDates.forEach((t) => {
+      const d = daysUntilDate(t.date);
+      const notifKey = t.id;
+      if (d === 1 && trashLastNotified[notifKey] !== todayStr) {
+        const typeInfo = TRASH_TYPES[t.type] || { label: t.type };
+        new Notification('Wywóz śmieci jutro', { body: `${typeInfo.label} — jutro jest dzień wywozu.` });
+        trashLastNotified[notifKey] = todayStr;
+        changed = true;
+      }
+    });
+
+    if (changed) saveTrashLastNotified();
+  }
 
   // --- Login / logout ---
 
@@ -639,22 +1215,22 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   async function attemptLogin() {
     const password = loginPassword.value;
     if (!password) {
-      loginError.textContent = 'Enter the household password.';
+      loginError.textContent = 'Wpisz hasło domowe.';
       loginError.classList.remove('hidden');
       return;
     }
     loginSubmit.disabled = true;
-    loginSubmit.textContent = 'Logging in…';
+    loginSubmit.textContent = 'Logowanie…';
     try {
       await signInWithEmailAndPassword(auth, HOUSEHOLD_EMAIL, password);
       loginError.classList.add('hidden');
     } catch (e) {
       console.error('Login failed', e);
-      loginError.textContent = 'Incorrect password. Try again.';
+      loginError.textContent = 'Nieprawidłowe hasło. Spróbuj ponownie.';
       loginError.classList.remove('hidden');
     }
     loginSubmit.disabled = false;
-    loginSubmit.textContent = 'Log in';
+    loginSubmit.textContent = 'Zaloguj się';
   }
 
   loginSubmit.addEventListener('click', attemptLogin);
@@ -683,8 +1259,11 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     loadLocalOnly();
     buildDayPicker();
     buildFilterChips();
+    buildTrashTypePicker();
     updateNotifBanner();
+    updateTrashNotifBanner();
     setInterval(checkAndNotify, 60 * 60 * 1000);
+    setInterval(checkTrashNotify, 60 * 60 * 1000);
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(() => {

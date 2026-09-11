@@ -1,4 +1,4 @@
-const CACHE_NAME = 'payment-reminders-v3';
+const CACHE_NAME = 'payment-reminders-v5';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.json'];
 
 self.addEventListener('install', (event) => {

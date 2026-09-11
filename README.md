@@ -1,11 +1,17 @@
-# Payment Reminders (Web)
+# Zarządzanie domem (Household Management)
 
-An HTML/CSS/JS web app that tracks your monthly bills and reminds you
-before they're due — installable as a PWA, no build step, and now backed
-by a shared Firebase database so anyone with the site open sees the same
-live data (e.g. you and a partner).
+An HTML/CSS/JS web app with three sections, sharing one login and one
+Firebase backend:
 
-## Features
+- **Płatności** (Payments) — recurring bill tracking with reminders
+- **Składzik** (Pantry) — simple home inventory with a totals overview
+- **Wywóz śmieci** (Trash collection) — a calendar of pickup dates with
+  reminders the day before
+
+Installable as a PWA, no build step, backed by Firebase so anyone logged
+in with the household password sees the same live data.
+
+## Płatności (Payments)
 
 - Add/edit/delete recurring payments (name, amount, due day)
 - Set frequency per payment: every month, or every 2 months
@@ -14,25 +20,43 @@ live data (e.g. you and a partner).
 - Pick the due day from a 1–31 grid picker instead of typing a number
 - Notes field for account/company details (e.g. "mBank ...1234")
 - Calendar view: a full month grid showing every bill on its due date
-  (only shown in months it's actually due, for every-2-months bills), with
-  prev/next month navigation, color-coded by status
+  (only shown in months it's actually due, for every-2-months bills)
 - See at a glance which bills are overdue, due soon, or paid
-- Mark a bill as paid for its current cycle (resets automatically at the
-  next occurrence — one month later for monthly bills, two for bi-monthly)
+- Mark a bill as paid for its current cycle
 - Amounts shown in PLN
-- Amounts shown in PLN
-- **Password-protected**: one shared household login gates access to the
-  app and the data
-- **Shared, live data**: payments and paid status sync through Firebase
-  Realtime Database — anyone logged in sees changes from anyone else,
-  automatically, no manual refresh needed
 - Browser notifications, checked hourly and whenever the tab regains focus
-- Installable as a PWA (desktop or mobile) via the browser's "Install app" option
 
 Note: a monthly bill is due every month on its chosen day. A bi-monthly
 ("every 2 months") bill is anchored to the month you created it (or the
 month you last changed its frequency) and recurs every 2 months from
-there — so the calendar only shows it every other month.
+there.
+
+## Składzik (Pantry)
+
+- Add items you have in storage: name, amount, and a free-text unit
+  (e.g. "kg", "szt", "opak.")
+- Edit or delete any entry
+- "Total overview" tab groups entries by matching name + unit and shows
+  the summed total — e.g. if you've logged flour three separate times,
+  it shows one combined total rather than three separate lines
+- No notifications for this section (items don't have due dates)
+
+## Wywóz śmieci (Trash collection)
+
+- Add collection dates with a type: BIO (brown), Zmieszane/mixed (grey),
+  or Segregowane/sorted (yellow)
+- "Upcoming" list shows all dates sorted, with past ones dimmed
+- Calendar view shows every date as a color-coded pill, with prev/next
+  month navigation
+- Browser notification the day before a collection date
+- Dates are entered and edited manually in the app — there's no automatic
+  municipal calendar lookup, so keep it updated as your local schedule
+  changes (e.g. holidays shifting pickup days)
+
+## Shared login
+
+All three sections sit behind one shared household password (Firebase
+Authentication, Email/Password).
 
 ## Firebase setup
 
@@ -52,31 +76,28 @@ Firebase console (Project settings → your web app).
    whatever password you want the household to use.
 3. That's it — anyone who knows the password can log in on the app's
    login screen. There's only one shared account, not separate logins
-   per person; the "Assigned to" field in the app is just a label, not a
-   real per-user permission system.
+   per person; the "Assigned to" field in the Płatności section is just
+   a label, not a real per-user permission system.
 
 To change the password later, go to Authentication → Users, find that
 one user, and reset its password from the console.
 
 ### Database rules
 
-Since the app now requires login, the database rules should require
-authentication rather than being fully open:
-
 ```json
 {
   "rules": {
     "payments": { ".read": "auth != null", ".write": "auth != null" },
-    "paidStatus": { ".read": "auth != null", ".write": "auth != null" }
+    "paidStatus": { ".read": "auth != null", ".write": "auth != null" },
+    "pantry": { ".read": "auth != null", ".write": "auth != null" },
+    "trash": { ".read": "auth != null", ".write": "auth != null" }
   }
 }
 ```
 
 Paste this into Firebase console → Realtime Database → Rules → Publish.
-This replaces the earlier fully-open rules and means only someone who has
-logged in with the household password can read or write the data —
-importantly, these rules don't expire the way Firebase's default test-mode
-rules do.
+Only someone logged in with the household password can read or write any
+of the app's data, and these rules don't expire.
 
 ## Running it locally
 
@@ -115,31 +136,31 @@ here). If you keep a tab or the installed PWA open, you'll get reminders
 reliably (checked hourly and on tab focus). If it's fully closed, you'll
 be caught up immediately the next time you open it.
 
-**Requires an internet connection.** Since payment data now lives in
-Firebase rather than on-device, the app needs network access to load or
-save anything — it's no longer usable fully offline the way the
-localStorage-only version was. The service worker still caches the app's
-own files for fast loading, but the data itself won't load without a
-connection.
+**Requires an internet connection.** All data lives in Firebase, so the
+app needs network access to load or save anything. The service worker
+still caches the app's own files for fast loading, but the data itself
+won't load without a connection.
 
 If you want reminders that work even with everything closed, the desktop
-(Electron) or mobile (Expo) versions handle that natively — worth asking
-for if this matters to you.
+(Electron) or mobile (Expo) versions of the Płatności section handle that
+natively — worth asking for if this matters to you.
 
 ## Project structure
 
 ```
-index.html          # App markup
+index.html          # App markup: login screen + 3 sections
 style.css            # Styling
-app.js               # All app logic: storage, rendering, notifications
+app.js               # All app logic: auth, storage, rendering, notifications
 manifest.json        # PWA manifest (name, icons, install behavior)
-service-worker.js    # Offline caching
+service-worker.js    # Offline caching of the app's own files
 ```
 
 ## Customizing
 
 - **Check frequency**: change `60 * 60 * 1000` in `app.js` (`init` function).
-- **Notification lead time default**: change the `2` in `daysBefore ?? 2`.
+- **Payment notification lead time default**: change the `2` in `daysBefore ?? 2`.
+- **Trash notification lead time**: currently fixed at 1 day before
+  (`d === 1` in `checkTrashNotify`) — change that condition to adjust.
 - **Icons**: add your own `icon-192.png` / `icon-512.png` next to
   `manifest.json` for a custom app icon when installed (any square PNGs
   work — the manifest already references these filenames).
