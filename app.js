@@ -69,6 +69,8 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const notifEnable = document.getElementById('notif-enable');
   const notifDismiss = document.getElementById('notif-dismiss');
   const filterChipsEl = document.getElementById('filter-chips');
+  const onceElsewhereSection = document.getElementById('once-elsewhere-section');
+  const onceElsewhereList = document.getElementById('once-elsewhere-list');
   const syncStatusEl = document.getElementById('sync-status');
   const loginScreen = document.getElementById('login-screen');
   const appRoot = document.getElementById('app-root');
@@ -727,6 +729,46 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     listEl.querySelectorAll('.pay-btn').forEach((btn) => btn.addEventListener('click', () => togglePaid(btn.dataset.id)));
     listEl.querySelectorAll('.del-btn').forEach((btn) => btn.addEventListener('click', () => deletePayment(btn.dataset.id)));
     listEl.querySelectorAll('.edit-btn').forEach((btn) => btn.addEventListener('click', () => editPayment(btn.dataset.id)));
+
+    // One-time payments not due this month are hidden from the main list
+    // (by design), but still need to be reachable to edit or delete —
+    // e.g. a test entry, or a bill scheduled a few months out.
+    const elsewhere = filteredPayments().filter(
+      (p) => p.frequency === 'once' && !isDueInMonth(p, now.getFullYear(), now.getMonth())
+    );
+    onceElsewhereSection.classList.toggle('hidden', elsewhere.length === 0);
+    onceElsewhereList.innerHTML = '';
+
+    const elsewhereSorted = [...elsewhere].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    elsewhereSorted.forEach((p) => {
+      const person = p.person || 'Ogólne';
+      const dateLabel = p.date
+        ? parseIsoDate(p.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '';
+      const row = document.createElement('div');
+      row.className = 'payment-row';
+      row.style.opacity = '0.75';
+      row.innerHTML = `
+        <div class="payment-top">
+          <div>
+            <p class="payment-name">${escapeHtml(p.name)}</p>
+            <p class="payment-detail">${fmt(p.amount)} · ${dateLabel} · jednorazowo</p>
+            ${p.notes ? `<p class="payment-notes">${escapeHtml(p.notes)}</p>` : ''}
+            <span class="person-tag ${personTagClass(person)}">${escapeHtml(person)}</span>
+          </div>
+        </div>
+        <div class="payment-actions">
+          <div class="action-btns">
+            <button class="edit-btn" data-id="${p.id}">Edytuj</button>
+            <button class="del-btn" data-id="${p.id}">Usuń</button>
+          </div>
+        </div>
+      `;
+      onceElsewhereList.appendChild(row);
+    });
+
+    onceElsewhereList.querySelectorAll('.del-btn').forEach((btn) => btn.addEventListener('click', () => deletePayment(btn.dataset.id)));
+    onceElsewhereList.querySelectorAll('.edit-btn').forEach((btn) => btn.addEventListener('click', () => editPayment(btn.dataset.id)));
   }
 
   function togglePaid(id) {

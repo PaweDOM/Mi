@@ -19,9 +19,13 @@ in with the household password sees the same live data.
 - Add/edit/delete payments (name, amount, due day)
 - Set frequency per payment: every month, every 2 months, or one-time
   ("Jednorazowo") — a one-time payment uses a specific date instead of a
-  recurring day-of-month, and only appears in the list during the calendar
-  month it's actually due (it disappears from the list afterward, though
-  its data is kept)
+  recurring day-of-month, and only appears in the main list during the
+  calendar month it's actually due
+- One-time payments due in a *different* month still show up in a
+  separate "Jednorazowe w innych miesiącach" section at the bottom of the
+  list, so you can always edit or delete them (e.g. a test entry, or a
+  bill scheduled a few months out) — they just aren't counted in the
+  current month's total and don't clutter the main list
 - Assign each payment to "Paweł", "Marta", or "Ogólne" — filter the list
   and calendar by person using the chips above the view
 - Pick the due day from a 1–31 grid picker instead of typing a number
