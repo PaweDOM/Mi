@@ -13,6 +13,11 @@ import {
   setPersistence,
   browserLocalPersistence,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getMessaging,
+  getToken,
+  isSupported as isMessagingSupported,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDQqsm2QzuZykRlngOsRmr--IeTGTynZCY",
@@ -30,6 +35,10 @@ const firebaseConfig = {
 // Authentication → Users, with whatever password you choose there.
 const HOUSEHOLD_EMAIL = "household@payment-reminders.local";
 
+// Generated in Firebase console → Project settings → Cloud Messaging →
+// Web Push certificates. Needed for the browser to register for push.
+const VAPID_KEY = "BJjP3hya4wKP64OupL3hzoYg2nlLIVda3UiWH8ZFhnGehkIsn6b06J61kIOJitCuREtsNpcl-PVKwjTZVd8qrZg";
+
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
 const auth = getAuth(firebaseApp);
@@ -38,6 +47,7 @@ const paidStatusRef = ref(db, "paidStatus");
 const pantryRef = ref(db, "pantry");
 const trashRef = ref(db, "trash");
 const shoppingRef = ref(db, "shopping");
+const fcmTokensRef = ref(db, "fcmTokens");
 
 setPersistence(auth, browserLocalPersistence).catch((e) => {
   console.error('Failed to set auth persistence', e);
@@ -625,10 +635,34 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     banner.classList.toggle('hidden', !show);
   }
 
+  // Registers this browser for push notifications (works even with the
+  // app fully closed, unlike the in-page checkAndNotify/checkTrashNotify
+  // checks). The resulting token is stored in Firebase so the Cloud
+  // Function knows where to send reminders.
+  async function registerPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    try {
+      const supported = await isMessagingSupported();
+      if (!supported) return;
+      const registration = await navigator.serviceWorker.ready;
+      const messaging = getMessaging(firebaseApp);
+      const token = await getToken(messaging, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: registration,
+      });
+      if (token) {
+        await dbSet(ref(db, `fcmTokens/${token}`), { updatedAt: Date.now() });
+      }
+    } catch (e) {
+      console.error('Push registration failed', e);
+    }
+  }
+
   notifEnable.addEventListener('click', async () => {
     if (!('Notification' in window)) return;
     await Notification.requestPermission();
     updateNotifBanner();
+    if (Notification.permission === 'granted') registerPush();
   });
 
   notifDismiss.addEventListener('click', () => {
@@ -1619,6 +1653,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     await Notification.requestPermission();
     updateNotifBanner();
     updateTrashNotifBanner();
+    if (Notification.permission === 'granted') registerPush();
   });
 
   trashNotifDismiss.addEventListener('click', () => {
@@ -1717,6 +1752,9 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       navigator.serviceWorker.register('service-worker.js').catch(() => {
         // Non-fatal: app still works fully without the service worker.
       });
+      if ('Notification' in window && Notification.permission === 'granted') {
+        registerPush();
+      }
     }
   }
 

@@ -120,14 +120,31 @@ one user, and reset its password from the console.
     "paidStatus": { ".read": "auth != null", ".write": "auth != null" },
     "pantry": { ".read": "auth != null", ".write": "auth != null" },
     "trash": { ".read": "auth != null", ".write": "auth != null" },
-    "shopping": { ".read": "auth != null", ".write": "auth != null" }
+    "shopping": { ".read": "auth != null", ".write": "auth != null" },
+    "fcmTokens": { ".read": "auth != null", ".write": "auth != null" },
+    "pushNotified": { ".read": true, ".write": true },
+    "pushTrashNotified": { ".read": true, ".write": true }
   }
 }
 ```
 
 Paste this into Firebase console → Realtime Database → Rules → Publish.
 Only someone logged in with the household password can read or write any
-of the app's data, and these rules don't expire.
+of the app's data, and these rules don't expire. The last three paths
+(`fcmTokens`, `pushNotified`, `pushTrashNotified`) support push
+notifications — see the separate `household-app-functions` project for
+the Cloud Function that actually sends them, since a browser tab alone
+can't send notifications while it's closed.
+
+### Push notifications (optional but recommended)
+
+Browser notifications only fire while the app is open in a tab. For
+notifications that work even with the app fully closed, deploy the
+Cloud Function in the `household-app-functions` project — it runs on a
+schedule and pushes reminders to every device that's granted
+notification permission in this app. See that project's own README for
+setup (it requires upgrading Firebase to the Blaze plan, but stays free
+in practice for a household's worth of usage).
 
 ## Running it locally
 
