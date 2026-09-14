@@ -16,8 +16,12 @@ in with the household password sees the same live data.
 
 ## Płatności (Payments)
 
-- Add/edit/delete recurring payments (name, amount, due day)
-- Set frequency per payment: every month, or every 2 months
+- Add/edit/delete payments (name, amount, due day)
+- Set frequency per payment: every month, every 2 months, or one-time
+  ("Jednorazowo") — a one-time payment uses a specific date instead of a
+  recurring day-of-month, and only appears in the list during the calendar
+  month it's actually due (it disappears from the list afterward, though
+  its data is kept)
 - Assign each payment to "Paweł", "Marta", or "Ogólne" — filter the list
   and calendar by person using the chips above the view
 - Pick the due day from a 1–31 grid picker instead of typing a number
@@ -42,7 +46,7 @@ there.
 - "Co miesięczne" items also get a type: Dom, Kaziczek, Rosa, or Inne —
   the list is presented grouped under those headings, and the ▲/▼ buttons
   move an item within its own type group rather than the whole list
-- The header count shows how many unchecked items remain across both lists
+- Each list shows its own separate unchecked-item count in the header
 - No notifications for this section
 
 ## Składzik (Pantry)
@@ -62,6 +66,10 @@ there.
 
 - Add collection dates with a type: BIO (brown), Zmieszane/mixed (grey),
   or Segregowane/sorted (yellow)
+- Add several dates at once for the same type: pick a date, click
+  "+ Dodaj datę" to stage it as a chip, repeat, then Save adds them all
+  together — faster than adding one at a time. (Editing an existing entry
+  still edits just that one date.)
 - "Upcoming" list shows all dates sorted, with past ones dimmed
 - Calendar view shows every date as a color-coded pill, with prev/next
   month navigation

@@ -695,6 +695,39 @@ button.text-btn {
   margin-top: 0;
 }
 
+/* --- Date chips (multi-date add for Wywóz śmieci) --- */
+
+.chip-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1efe8;
+  border-radius: 999px;
+  padding: 4px 6px 4px 10px;
+  font-size: 12px;
+  color: #333;
+}
+
+.date-chip button {
+  border: none;
+  background: none;
+  color: #888;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.date-chip button:hover {
+  color: #a32d2d;
+}
+
 /* --- Pantry type badge --- */
 
 .pantry-type-badge {

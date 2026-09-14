@@ -73,13 +73,21 @@
             <select id="f-frequency" class="select">
               <option value="1">Co miesiąc</option>
               <option value="2">Co 2 miesiące</option>
+              <option value="once">Jednorazowo</option>
             </select>
           </div>
         </div>
 
-        <p class="inline-label" style="margin: 0 0 -4px;">Dzień płatności w miesiącu</p>
-        <div id="day-picker" class="day-picker"></div>
-        <p class="picker-selected">Wybrany dzień: <span id="day-picker-selected">brak</span></p>
+        <div id="f-recurring-day-block">
+          <p class="inline-label" style="margin: 0 0 -4px;">Dzień płatności w miesiącu</p>
+          <div id="day-picker" class="day-picker"></div>
+          <p class="picker-selected">Wybrany dzień: <span id="day-picker-selected">brak</span></p>
+        </div>
+
+        <div id="f-once-date-block" class="hidden">
+          <p class="inline-label" style="margin: 0 0 4px;">Data płatności</p>
+          <input type="date" id="f-once-date" />
+        </div>
 
         <div class="row">
           <label for="f-lead" class="inline-label">Przypomnij mi tyle dni wcześniej:</label>
@@ -113,8 +121,12 @@
     <div id="section-shopping" class="section hidden">
       <header>
         <div>
-          <p class="label">Lista zakupów</p>
-          <p class="total" id="shopping-count">0</p>
+          <p class="label">Ogólne</p>
+          <p class="total" id="shopping-count-ogolne">0</p>
+        </div>
+        <div>
+          <p class="label">Co miesięczne</p>
+          <p class="total" id="shopping-count-comiesieczne">0</p>
         </div>
       </header>
 
@@ -225,7 +237,11 @@
           <button type="button" class="trash-type-btn" data-type="segregowane">Segregowane</button>
         </div>
         <p class="inline-label" style="margin: 4px 0 4px;">Data</p>
-        <input type="date" id="trash-date" />
+        <div class="row">
+          <input type="date" id="trash-date" style="flex:1;" />
+          <button type="button" id="trash-add-date-btn">+ Dodaj datę</button>
+        </div>
+        <div id="trash-date-chips" class="chip-list"></div>
         <p id="trash-error" class="error hidden"></p>
         <div class="row end">
           <button id="trash-cancel">Anuluj</button>

@@ -62,6 +62,9 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const fError = document.getElementById('f-error');
   const fSave = document.getElementById('f-save');
   const fCancel = document.getElementById('f-cancel');
+  const fRecurringDayBlock = document.getElementById('f-recurring-day-block');
+  const fOnceDateBlock = document.getElementById('f-once-date-block');
+  const fOnceDate = document.getElementById('f-once-date');
   const banner = document.getElementById('notif-banner');
   const notifEnable = document.getElementById('notif-enable');
   const notifDismiss = document.getElementById('notif-dismiss');
@@ -85,7 +88,8 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const sectionTrash = document.getElementById('section-trash');
 
   // --- Shopping list (Lista zakupów) elements ---
-  const shoppingCountEl = document.getElementById('shopping-count');
+  const shoppingCountOgolneEl = document.getElementById('shopping-count-ogolne');
+  const shoppingCountComiesiecznEl = document.getElementById('shopping-count-comiesieczne');
   const shoppingTabOgolne = document.getElementById('shopping-tab-ogolne');
   const shoppingTabComiesieczne = document.getElementById('shopping-tab-comiesieczne');
   const shoppingListOgolne = document.getElementById('shopping-list-ogolne');
@@ -127,6 +131,8 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const trashForm = document.getElementById('trash-form');
   const trashAddBtn = document.getElementById('trash-add-btn');
   const trashDateInput = document.getElementById('trash-date');
+  const trashAddDateBtn = document.getElementById('trash-add-date-btn');
+  const trashDateChips = document.getElementById('trash-date-chips');
   const trashError = document.getElementById('trash-error');
   const trashSave = document.getElementById('trash-save');
   const trashCancel = document.getElementById('trash-cancel');
@@ -198,6 +204,10 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   // Whether a payment (with its frequency and anchor month) falls due in a given year/month.
   function isDueInMonth(payment, year, month) {
+    if (payment.frequency === 'once') {
+      const due = parseIsoDate(payment.date);
+      return due.getFullYear() === year && due.getMonth() === month;
+    }
     const interval = payment.frequency || 1;
     if (interval <= 1) return true;
     const now = new Date();
@@ -209,6 +219,9 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   // Finds this payment's next due date (today or later), honoring its frequency.
   function nextOccurrence(payment) {
+    if (payment.frequency === 'once') {
+      return parseIsoDate(payment.date);
+    }
     const now = new Date();
     let year = now.getFullYear();
     let month = now.getMonth();
@@ -228,6 +241,11 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   }
 
   function daysUntilPayment(payment) {
+    if (payment.frequency === 'once') {
+      const due = parseIsoDate(payment.date);
+      const today = dateOnly(new Date());
+      return Math.round((due - today) / 86400000);
+    }
     const occ = nextOccurrence(payment);
     if (!occ) return 9999;
     const now = new Date();
@@ -236,6 +254,9 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   }
 
   function occurrenceKey(payment) {
+    if (payment.frequency === 'once') {
+      return `${monthKey(parseIsoDate(payment.date))}:${payment.id}`;
+    }
     const occ = nextOccurrence(payment);
     return occ ? `${monthKey(occ)}:${payment.id}` : `${monthKey()}:${payment.id}`;
   }
@@ -650,7 +671,11 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   function render() {
     listEl.innerHTML = '';
-    const visible = filteredPayments();
+    const now = new Date();
+    const visible = filteredPayments().filter((p) => {
+      if (p.frequency !== 'once') return true;
+      return isDueInMonth(p, now.getFullYear(), now.getMonth());
+    });
     emptyEl.classList.toggle('hidden', visible.length !== 0);
 
     let total = 0;
@@ -661,7 +686,12 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       const st = statusFor(p);
       const isPaid = st.cls === 'success';
       const person = p.person || 'Ogólne';
-      const freqLabel = (p.frequency || 1) > 1 ? `co ${p.frequency} miesiące` : 'co miesiąc';
+      const freqLabel = p.frequency === 'once'
+        ? 'jednorazowo'
+        : ((p.frequency || 1) > 1 ? `co ${p.frequency} miesiące` : 'co miesiąc');
+      const dueLabel = p.frequency === 'once'
+        ? parseIsoDate(p.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
+        : `dzień ${p.day}`;
 
       const row = document.createElement('div');
       row.className = 'payment-row';
@@ -669,7 +699,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
         <div class="payment-top">
           <div>
             <p class="payment-name">${escapeHtml(p.name)}</p>
-            <p class="payment-detail">${fmt(p.amount)} · dzień ${p.day} · ${freqLabel}</p>
+            <p class="payment-detail">${fmt(p.amount)} · ${dueLabel} · ${freqLabel}</p>
             ${p.notes ? `<p class="payment-notes">${escapeHtml(p.notes)}</p>` : ''}
             <span class="person-tag ${personTagClass(person)}">${escapeHtml(person)}</span>
           </div>
@@ -687,9 +717,9 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     });
 
     // Total reflects only payments due this calendar month (bi-monthly bills
-    // not due this month aren't counted toward "this month's total").
+    // not due this month, and one-time payments outside their due month,
+    // aren't counted toward "this month's total").
     total = visible.reduce((sum, p) => {
-      const now = new Date();
       return isDueInMonth(p, now.getFullYear(), now.getMonth()) ? sum + Number(p.amount) : sum;
     }, 0);
     totalEl.textContent = fmt(total);
@@ -716,6 +746,14 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     if (!calendarView.classList.contains('hidden')) renderCalendar();
   }
 
+  function toggleFrequencyBlocks() {
+    const isOnce = fFrequency.value === 'once';
+    fRecurringDayBlock.classList.toggle('hidden', isOnce);
+    fOnceDateBlock.classList.toggle('hidden', !isOnce);
+  }
+
+  fFrequency.addEventListener('change', toggleFrequencyBlocks);
+
   function editPayment(id) {
     const p = payments.find((x) => x.id === id);
     if (!p) return;
@@ -724,8 +762,13 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     fAmount.value = p.amount;
     fNotes.value = p.notes || '';
     fPerson.value = p.person || 'Ogólne';
-    fFrequency.value = String(p.frequency || 1);
-    selectDay(p.day);
+    fFrequency.value = p.frequency === 'once' ? 'once' : String(p.frequency || 1);
+    if (p.frequency === 'once') {
+      fOnceDate.value = p.date || '';
+    } else {
+      selectDay(p.day);
+    }
+    toggleFrequencyBlocks();
     fLead.value = p.daysBefore ?? 2;
     fError.classList.add('hidden');
     form.classList.remove('hidden');
@@ -743,6 +786,8 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     selectedDay = null;
     dayPickerSelected.textContent = 'brak';
     dayPicker.querySelectorAll('button').forEach((btn) => btn.classList.remove('selected'));
+    fOnceDate.value = '';
+    toggleFrequencyBlocks();
     fLead.value = '2';
     fError.classList.add('hidden');
     fSave.textContent = 'Zapisz';
@@ -764,13 +809,24 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     const name = fName.value.trim();
     const amount = parseFloat(fAmount.value);
     const notes = fNotes.value.trim();
-    const day = selectedDay;
     const lead = parseInt(fLead.value || '2', 10);
     const person = fPerson.value;
-    const frequency = parseInt(fFrequency.value, 10) || 1;
+    const isOnce = fFrequency.value === 'once';
+    const frequency = isOnce ? 'once' : (parseInt(fFrequency.value, 10) || 1);
+    const day = isOnce ? (fOnceDate.value ? parseIsoDate(fOnceDate.value).getDate() : null) : selectedDay;
 
-    if (!name || isNaN(amount) || amount < 0 || !day) {
-      fError.textContent = 'Podaj nazwę, prawidłową kwotę i wybierz dzień płatności powyżej.';
+    if (!name || isNaN(amount) || amount < 0) {
+      fError.textContent = 'Podaj nazwę i prawidłową kwotę.';
+      fError.classList.remove('hidden');
+      return;
+    }
+    if (isOnce && !fOnceDate.value) {
+      fError.textContent = 'Wybierz datę płatności.';
+      fError.classList.remove('hidden');
+      return;
+    }
+    if (!isOnce && !day) {
+      fError.textContent = 'Wybierz dzień płatności na kalendarzu powyżej.';
       fError.classList.remove('hidden');
       return;
     }
@@ -780,18 +836,23 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       payments = payments.map((p) => {
         if (p.id !== editingId) return p;
         const next = { ...p, name, amount, day, daysBefore: lead, person, frequency, notes };
-        // If the frequency changed on an existing bill, re-anchor to the
-        // current month so "every 2 months" starts counting from now.
-        if ((p.frequency || 1) !== frequency) {
-          const now = new Date();
-          next.anchorYear = now.getFullYear();
-          next.anchorMonth = now.getMonth();
+        if (isOnce) {
+          next.date = fOnceDate.value;
+        } else {
+          delete next.date;
+          // If the frequency changed on an existing bill, re-anchor to the
+          // current month so "every 2 months" starts counting from now.
+          if ((p.frequency || 1) !== frequency) {
+            const now = new Date();
+            next.anchorYear = now.getFullYear();
+            next.anchorMonth = now.getMonth();
+          }
         }
         return next;
       });
     } else {
       const now = new Date();
-      payments.push({
+      const newPayment = {
         id: 'p' + Date.now() + Math.random().toString(36).slice(2, 7),
         name,
         amount,
@@ -800,9 +861,14 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
         person,
         frequency,
         notes,
-        anchorYear: now.getFullYear(),
-        anchorMonth: now.getMonth(),
-      });
+      };
+      if (isOnce) {
+        newPayment.date = fOnceDate.value;
+      } else {
+        newPayment.anchorYear = now.getFullYear();
+        newPayment.anchorMonth = now.getMonth();
+      }
+      payments.push(newPayment);
     }
 
     form.classList.add('hidden');
@@ -897,9 +963,10 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     refs.items.innerHTML = '';
     refs.empty.classList.toggle('hidden', items.length !== 0);
 
-    const totalUnchecked = shoppingItems.ogolne.filter((i) => !i.checked).length +
-      shoppingItems.comiesieczne.filter((i) => !i.checked).length;
-    shoppingCountEl.textContent = String(totalUnchecked);
+    const uncheckedOgolne = shoppingItems.ogolne.filter((i) => !i.checked).length;
+    const uncheckedComiesieczne = shoppingItems.comiesieczne.filter((i) => !i.checked).length;
+    shoppingCountOgolneEl.textContent = String(uncheckedOgolne);
+    shoppingCountComiesiecznEl.textContent = String(uncheckedComiesieczne);
 
     if (listName === 'comiesieczne') {
       // Grouped presentation by type, per the "selecting type" flow.
@@ -1362,6 +1429,31 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     renderTrashCalendar();
   });
 
+  let pendingTrashDates = [];
+
+  function renderTrashDateChips() {
+    trashDateChips.innerHTML = '';
+    pendingTrashDates.forEach((iso) => {
+      const label = parseIsoDate(iso).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' });
+      const chip = document.createElement('span');
+      chip.className = 'date-chip';
+      chip.innerHTML = `${label} <button type="button" data-date="${iso}">×</button>`;
+      chip.querySelector('button').addEventListener('click', (e) => {
+        pendingTrashDates = pendingTrashDates.filter((d) => d !== e.target.dataset.date);
+        renderTrashDateChips();
+      });
+      trashDateChips.appendChild(chip);
+    });
+  }
+
+  trashAddDateBtn.addEventListener('click', () => {
+    const val = trashDateInput.value;
+    if (!val) return;
+    if (!pendingTrashDates.includes(val)) pendingTrashDates.push(val);
+    trashDateInput.value = '';
+    renderTrashDateChips();
+  });
+
   function editTrashDate(id) {
     const t = trashDates.find((x) => x.id === id);
     if (!t) return;
@@ -1371,6 +1463,9 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       b.classList.toggle('selected', b.dataset.type === t.type)
     );
     trashDateInput.value = t.date;
+    pendingTrashDates = [];
+    renderTrashDateChips();
+    trashAddDateBtn.classList.add('hidden');
     trashError.classList.add('hidden');
     trashForm.classList.remove('hidden');
     trashSave.textContent = 'Zapisz zmiany';
@@ -1381,6 +1476,9 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     selectedTrashType = null;
     trashTypePicker.querySelectorAll('.trash-type-btn').forEach((b) => b.classList.remove('selected'));
     trashDateInput.value = '';
+    pendingTrashDates = [];
+    renderTrashDateChips();
+    trashAddDateBtn.classList.remove('hidden');
     trashError.classList.add('hidden');
     trashSave.textContent = 'Zapisz';
   }
@@ -1405,22 +1503,42 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   trashSave.addEventListener('click', () => {
     const type = selectedTrashType;
-    const date = trashDateInput.value;
 
-    if (!type || !date) {
+    if (!type) {
       trashError.textContent = 'Wybierz typ i datę.';
       trashError.classList.remove('hidden');
       return;
     }
-    trashError.classList.add('hidden');
 
     if (editingTrashId) {
+      const date = trashDateInput.value;
+      if (!date) {
+        trashError.textContent = 'Wybierz typ i datę.';
+        trashError.classList.remove('hidden');
+        return;
+      }
+      trashError.classList.add('hidden');
       trashDates = trashDates.map((t) => (t.id === editingTrashId ? { ...t, type, date } : t));
     } else {
-      trashDates.push({
-        id: 't' + Date.now() + Math.random().toString(36).slice(2, 7),
-        type,
-        date,
+      // Combine any chip dates with whatever's currently in the date field,
+      // so a single click on the current date still works without needing
+      // "+ Dodaj datę" first.
+      const finalDates = [...pendingTrashDates];
+      if (trashDateInput.value && !finalDates.includes(trashDateInput.value)) {
+        finalDates.push(trashDateInput.value);
+      }
+      if (finalDates.length === 0) {
+        trashError.textContent = 'Wybierz typ i przynajmniej jedną datę.';
+        trashError.classList.remove('hidden');
+        return;
+      }
+      trashError.classList.add('hidden');
+      finalDates.forEach((date) => {
+        trashDates.push({
+          id: 't' + Date.now() + Math.random().toString(36).slice(2, 7),
+          type,
+          date,
+        });
       });
     }
 
