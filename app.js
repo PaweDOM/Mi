@@ -16,6 +16,7 @@ import {
 import {
   getMessaging,
   getToken,
+  onMessage,
   isSupported as isMessagingSupported,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
@@ -639,6 +640,8 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   // app fully closed, unlike the in-page checkAndNotify/checkTrashNotify
   // checks). The resulting token is stored in Firebase so the Cloud
   // Function knows where to send reminders.
+  let foregroundMessagingWired = false;
+
   async function registerPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
@@ -652,6 +655,21 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       });
       if (token) {
         await dbSet(ref(db, `fcmTokens/${token}`), { updatedAt: Date.now() });
+      }
+      // FCM only auto-displays notifications when the app is backgrounded
+      // or closed (handled by the service worker). When the app is open
+      // in a foreground tab, we have to catch the message and show it
+      // ourselves — otherwise a push sent while you're using the app
+      // silently does nothing.
+      if (!foregroundMessagingWired) {
+        foregroundMessagingWired = true;
+        onMessage(messaging, (payload) => {
+          const title = (payload.notification && payload.notification.title) || 'Zarządzanie domem';
+          const body = (payload.notification && payload.notification.body) || '';
+          if (Notification.permission === 'granted') {
+            new Notification(title, { body });
+          }
+        });
       }
     } catch (e) {
       console.error('Push registration failed', e);
