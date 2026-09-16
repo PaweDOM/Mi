@@ -641,6 +641,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   // checks). The resulting token is stored in Firebase so the Cloud
   // Function knows where to send reminders.
   let foregroundMessagingWired = false;
+  let pushActive = false; // true once this device has a working push token
 
   async function registerPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
@@ -654,7 +655,20 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
         serviceWorkerRegistration: registration,
       });
       if (token) {
+        // If this same browser previously registered a different token
+        // (e.g. from an earlier deploy or a re-subscription), remove the
+        // old one so it doesn't keep receiving duplicate pushes forever.
+        const previousToken = localStorage.getItem('payment-reminders:fcmToken');
+        if (previousToken && previousToken !== token) {
+          try {
+            await dbSet(ref(db, `fcmTokens/${previousToken}`), null);
+          } catch (e) {
+            console.error('Failed to remove stale token', e);
+          }
+        }
+        localStorage.setItem('payment-reminders:fcmToken', token);
         await dbSet(ref(db, `fcmTokens/${token}`), { updatedAt: Date.now() });
+        pushActive = true;
       }
       // FCM only auto-displays notifications when the app is backgrounded
       // or closed (handled by the service worker). When the app is open
@@ -690,6 +704,9 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   function checkAndNotify() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    // Push notifications (server-side) already cover this device — firing
+    // our own local notification too would duplicate it.
+    if (pushActive) return;
     const todayStr = new Date().toDateString();
     let changed = false;
 
@@ -1681,6 +1698,9 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   function checkTrashNotify() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    // Push notifications (server-side) already cover this device — firing
+    // our own local notification too would duplicate it.
+    if (pushActive) return;
     const todayStr = new Date().toDateString();
     let changed = false;
 
