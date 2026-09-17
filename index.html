@@ -31,6 +31,7 @@
       <button id="nav-shopping" class="section-tab">Lista zakupów</button>
       <button id="nav-pantry" class="section-tab">Składzik</button>
       <button id="nav-trash" class="section-tab">Wywóz śmieci</button>
+      <button id="nav-savings" class="section-tab">Oszczędności</button>
     </div>
 
     <!-- ===================== PŁATNOŚCI ===================== -->
@@ -267,6 +268,76 @@
         </div>
         <div class="cal-grid" id="trash-cal-grid"></div>
       </div>
+    </div>
+
+    <!-- ===================== OSZCZĘDNOŚCI ===================== -->
+    <div id="section-savings" class="section hidden">
+      <header>
+        <div>
+          <p class="label">Razem (wszystko)</p>
+          <p class="total" id="savings-grand-total">0,00 zł</p>
+        </div>
+        <button id="savings-add-btn" class="primary">+ Dodaj</button>
+      </header>
+
+      <p id="savings-rates-note" class="sync-note">Ładowanie kursów…</p>
+      <button id="savings-refresh-rates" class="text-btn" style="padding:0; margin: -12px 0 16px; font-size:12px;">Odśwież kursy</button>
+
+      <div id="savings-form" class="form hidden">
+        <div class="row" id="savings-kind-picker">
+          <button type="button" class="savings-kind-btn" data-kind="money">Pieniądze</button>
+          <button type="button" class="savings-kind-btn" data-kind="metal">Kruszec</button>
+        </div>
+
+        <div id="savings-money-fields">
+          <p class="inline-label" style="margin: 8px 0 4px;">Waluta</p>
+          <select id="s-currency" class="select">
+            <option value="PLN">PLN</option>
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+          </select>
+          <p class="inline-label" style="margin: 8px 0 4px;">Kwota</p>
+          <input type="number" id="s-money-amount" placeholder="Kwota" min="0" step="0.01" />
+        </div>
+
+        <div id="savings-metal-fields" class="hidden">
+          <p class="inline-label" style="margin: 8px 0 4px;">Kruszec</p>
+          <p class="payment-detail" style="margin: 0 0 4px;">Złoto</p>
+
+          <p class="inline-label" style="margin: 8px 0 4px;">Jednostka</p>
+          <div class="row">
+            <button type="button" class="savings-unit-btn" data-unit="g">gram (g)</button>
+            <button type="button" class="savings-unit-btn" data-unit="oz">uncja (oz)</button>
+          </div>
+
+          <div id="savings-gram-amount-block">
+            <p class="inline-label" style="margin: 8px 0 4px;">Ilość (g)</p>
+            <input type="number" id="s-metal-amount" placeholder="Ilość" min="0" step="0.001" />
+          </div>
+
+          <div id="savings-oz-picker-block" class="hidden">
+            <p class="inline-label" style="margin: 8px 0 4px;">Ilość (oz)</p>
+            <div class="row" id="savings-oz-picker">
+              <button type="button" class="savings-oz-btn" data-oz="0.1">1/10 oz</button>
+              <button type="button" class="savings-oz-btn" data-oz="0.25">1/4 oz</button>
+              <button type="button" class="savings-oz-btn" data-oz="0.5">1/2 oz</button>
+              <button type="button" class="savings-oz-btn" data-oz="1">1 oz</button>
+            </div>
+          </div>
+        </div>
+
+        <p id="savings-error" class="error hidden"></p>
+        <div class="row end">
+          <button id="savings-cancel">Anuluj</button>
+          <button id="savings-save" class="primary">Zapisz</button>
+        </div>
+      </div>
+
+      <div id="savings-summary" class="list"></div>
+
+      <p class="pantry-group-heading">Pozycje</p>
+      <div id="savings-list" class="list"></div>
+      <p id="savings-empty" class="empty hidden">Brak zapisanych oszczędności. Dodaj pierwszą powyżej.</p>
     </div>
   </div>
 

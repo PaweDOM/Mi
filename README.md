@@ -1,6 +1,6 @@
 # Zarządzanie domem (Household Management)
 
-An HTML/CSS/JS web app with four sections, sharing one login and one
+An HTML/CSS/JS web app with five sections, sharing one login and one
 Firebase backend:
 
 - **Płatności** (Payments) — recurring bill tracking with reminders
@@ -10,6 +10,8 @@ Firebase backend:
   totals overview
 - **Wywóz śmieci** (Trash collection) — a calendar of pickup dates with
   reminders the day before
+- **Oszczędności** (Savings) — cash, foreign currency, and precious
+  metals valued live against current market rates
 
 Installable as a PWA, no build step, backed by Firebase so anyone logged
 in with the household password sees the same live data.
@@ -82,9 +84,42 @@ there.
   municipal calendar lookup, so keep it updated as your local schedule
   changes (e.g. holidays shifting pickup days)
 
+## Oszczędności (Savings)
+
+- Add two kinds of entries: **Pieniądze** (money — pick a currency, PLN/
+  EUR/USD, and an amount) or **Kruszec** (gold — silver is skipped for
+  now, see below)
+- For gold, pick a unit: grams (any amount) or troy ounces, where the
+  ounce amount is one of four fixed common bullion-coin sizes: 1/10,
+  1/4, 1/2, or 1 oz
+- Values are converted to PLN live using current market rates: EUR/PLN,
+  USD/PLN, and the gold price all come from the National Bank of
+  Poland's free public Web API (`api.nbp.pl`) — official, no API key
+  needed
+- Rates refresh automatically when you open the tab if they're more
+  than 6 hours old, or anytime via "Odśwież kursy"
+- Summary cards show a running total **per category** (cash PLN, EUR
+  in PLN-equivalent, USD in PLN-equivalent, gold in PLN) plus **one
+  grand total** across everything
+- Edit or delete any entry the same way as other sections
+- No notifications for this section
+
+### Silver (currently disabled)
+
+Silver was intentionally left out for now since NBP doesn't publish it
+(only gold) and a secondary source would've been needed. The plumbing
+for it (`fetchSilverPlnPerGram`, using Stooq converted via the USD
+rate) is still in `app.js`, just not called — re-enabling it means
+uncommenting a few lines in `loadRates()`, adding a silver option back
+to the metal picker, and adding the `silver` category back into the
+summary. Worth noting if you do: Stooq's endpoint isn't built with CORS
+in mind the way NBP's is, so it may need routing through the Cloud
+Function you already have running for push notifications, turned into
+a small proxy — ask if this comes up.
+
 ## Shared login
 
-All three sections sit behind one shared household password (Firebase
+All five sections sit behind one shared household password (Firebase
 Authentication, Email/Password).
 
 ## Firebase setup
@@ -121,6 +156,7 @@ one user, and reset its password from the console.
     "pantry": { ".read": "auth != null", ".write": "auth != null" },
     "trash": { ".read": "auth != null", ".write": "auth != null" },
     "shopping": { ".read": "auth != null", ".write": "auth != null" },
+    "savings": { ".read": "auth != null", ".write": "auth != null" },
     "fcmTokens": { ".read": "auth != null", ".write": "auth != null" },
     "pushNotified": { ".read": true, ".write": true },
     "pushTrashNotified": { ".read": true, ".write": true }

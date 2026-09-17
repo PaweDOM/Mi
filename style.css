@@ -751,3 +751,47 @@ button.text-btn {
 .pantry-group-heading:first-child {
   margin-top: 0;
 }
+
+/* --- Oszczędności (Savings) --- */
+
+.savings-kind-btn,
+.savings-metal-btn,
+.savings-unit-btn,
+.savings-oz-btn {
+  flex: 1;
+  padding: 10px 6px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.savings-kind-btn.selected,
+.savings-metal-btn.selected,
+.savings-unit-btn.selected,
+.savings-oz-btn.selected {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.savings-summary-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.savings-summary-label {
+  font-size: 13px;
+  color: #666;
+  margin: 0;
+}
+
+.savings-summary-value {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 2px 0 0;
+}

@@ -48,6 +48,7 @@ const paidStatusRef = ref(db, "paidStatus");
 const pantryRef = ref(db, "pantry");
 const trashRef = ref(db, "trash");
 const shoppingRef = ref(db, "shopping");
+const savingsRef = ref(db, "savings");
 const fcmTokensRef = ref(db, "fcmTokens");
 
 setPersistence(auth, browserLocalPersistence).catch((e) => {
@@ -95,10 +96,12 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const navShopping = document.getElementById('nav-shopping');
   const navPantry = document.getElementById('nav-pantry');
   const navTrash = document.getElementById('nav-trash');
+  const navSavings = document.getElementById('nav-savings');
   const sectionPayments = document.getElementById('section-payments');
   const sectionShopping = document.getElementById('section-shopping');
   const sectionPantry = document.getElementById('section-pantry');
   const sectionTrash = document.getElementById('section-trash');
+  const sectionSavings = document.getElementById('section-savings');
 
   // --- Shopping list (Lista zakupów) elements ---
   const shoppingCountOgolneEl = document.getElementById('shopping-count-ogolne');
@@ -162,6 +165,28 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const trashNotifEnable = document.getElementById('trash-notif-enable');
   const trashNotifDismiss = document.getElementById('trash-notif-dismiss');
 
+  // --- Savings (Oszczędności) elements ---
+  const savingsGrandTotalEl = document.getElementById('savings-grand-total');
+  const savingsAddBtn = document.getElementById('savings-add-btn');
+  const savingsRatesNote = document.getElementById('savings-rates-note');
+  const savingsRefreshRates = document.getElementById('savings-refresh-rates');
+  const savingsForm = document.getElementById('savings-form');
+  const savingsKindPicker = document.getElementById('savings-kind-picker');
+  const savingsMoneyFields = document.getElementById('savings-money-fields');
+  const savingsMetalFields = document.getElementById('savings-metal-fields');
+  const savingsGramAmountBlock = document.getElementById('savings-gram-amount-block');
+  const savingsOzPickerBlock = document.getElementById('savings-oz-picker-block');
+  const savingsOzPicker = document.getElementById('savings-oz-picker');
+  const sCurrency = document.getElementById('s-currency');
+  const sMoneyAmount = document.getElementById('s-money-amount');
+  const sMetalAmount = document.getElementById('s-metal-amount');
+  const savingsError = document.getElementById('savings-error');
+  const savingsCancel = document.getElementById('savings-cancel');
+  const savingsSave = document.getElementById('savings-save');
+  const savingsSummaryEl = document.getElementById('savings-summary');
+  const savingsListEl = document.getElementById('savings-list');
+  const savingsEmptyEl = document.getElementById('savings-empty');
+
   const PEOPLE = ['Paweł', 'Marta', 'Ogólne'];
   let activeFilter = 'All';
 
@@ -191,10 +216,12 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     sectionShopping.classList.toggle('hidden', name !== 'shopping');
     sectionPantry.classList.toggle('hidden', name !== 'pantry');
     sectionTrash.classList.toggle('hidden', name !== 'trash');
+    sectionSavings.classList.toggle('hidden', name !== 'savings');
     navPayments.classList.toggle('active', name === 'payments');
     navShopping.classList.toggle('active', name === 'shopping');
     navPantry.classList.toggle('active', name === 'pantry');
     navTrash.classList.toggle('active', name === 'trash');
+    navSavings.classList.toggle('active', name === 'savings');
     if (name === 'shopping') {
       renderShoppingList('ogolne');
       renderShoppingList('comiesieczne');
@@ -204,12 +231,20 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       renderTrashList();
       if (!trashCalendarView.classList.contains('hidden')) renderTrashCalendar();
     }
+    if (name === 'savings') {
+      renderSavings();
+      // Refresh rates if we don't have them yet, or they're getting old
+      // (older than 6 hours) — otherwise just show what we already have.
+      const stale = !ratesState.fetchedAt || (Date.now() - ratesState.fetchedAt) > 6 * 60 * 60 * 1000;
+      if (stale) loadRates();
+    }
   }
 
   navPayments.addEventListener('click', () => showSection('payments'));
   navShopping.addEventListener('click', () => showSection('shopping'));
   navPantry.addEventListener('click', () => showSection('pantry'));
   navTrash.addEventListener('click', () => showSection('trash'));
+  navSavings.addEventListener('click', () => showSection('savings'));
 
   function monthKey(date = new Date()) {
     return `${date.getFullYear()}-${date.getMonth() + 1}`;
@@ -309,12 +344,14 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   let pantryItems = [];
   let trashDates = [];
   let shoppingItems = { ogolne: [], comiesieczne: [] };
+  let savingsItems = [];
+  let ratesState = { eurPln: null, usdPln: null, goldPlnPerGram: null, silverPlnPerGram: null, fetchedAt: null, silverError: false };
 
-  let firebaseReady = { payments: false, paidStatus: false, pantry: false, trash: false, shopping: false };
+  let firebaseReady = { payments: false, paidStatus: false, pantry: false, trash: false, shopping: false, savings: false };
   let listenersAttached = false;
 
   function markConnected() {
-    if (firebaseReady.payments && firebaseReady.paidStatus && firebaseReady.pantry && firebaseReady.trash && firebaseReady.shopping) {
+    if (firebaseReady.payments && firebaseReady.paidStatus && firebaseReady.pantry && firebaseReady.trash && firebaseReady.shopping && firebaseReady.savings) {
       syncStatusEl.textContent = 'Na żywo — zsynchronizowane z każdym, kto ma otwartą tę stronę';
       syncStatusEl.className = 'sync-note live';
     }
@@ -341,6 +378,21 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       },
       (error) => {
         console.error('Firebase shopping read failed', error);
+        syncStatusEl.textContent = 'Nie można połączyć się z pamięcią współdzieloną — sprawdź połączenie.';
+        syncStatusEl.className = 'sync-note error';
+      }
+    );
+
+    onValue(
+      savingsRef,
+      (snapshot) => {
+        savingsItems = objToArray(snapshot.val());
+        firebaseReady.savings = true;
+        markConnected();
+        if (!sectionSavings.classList.contains('hidden')) renderSavings();
+      },
+      (error) => {
+        console.error('Firebase savings read failed', error);
         syncStatusEl.textContent = 'Nie można połączyć się z pamięcią współdzieloną — sprawdź połączenie.';
         syncStatusEl.className = 'sync-note error';
       }
@@ -450,6 +502,16 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       });
     } catch (e) {
       console.error('Failed to save shopping list', e);
+      syncStatusEl.textContent = 'Zapis nie powiódł się — sprawdź połączenie i spróbuj ponownie.';
+      syncStatusEl.className = 'sync-note error';
+    }
+  }
+
+  async function saveSavings() {
+    try {
+      await dbSet(savingsRef, paymentsToObj(savingsItems));
+    } catch (e) {
+      console.error('Failed to save savings', e);
       syncStatusEl.textContent = 'Zapis nie powiódł się — sprawdź połączenie i spróbuj ponownie.';
       syncStatusEl.className = 'sync-note error';
     }
@@ -1718,6 +1780,339 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     if (changed) saveTrashLastNotified();
   }
 
+  // ============================= OSZCZĘDNOŚCI (Savings) =============================
+
+  const OZ_TO_G = 31.1034768; // troy ounce → grams
+
+  const METAL_LABELS = { gold: 'Złoto', silver: 'Srebro' };
+  const CURRENCY_LABELS = { PLN: 'PLN', EUR: 'EUR', USD: 'USD' };
+
+  let editingSavingsId = null;
+  let selectedSavingsKind = 'money';
+  let selectedSavingsUnit = 'g';
+  let selectedSavingsOz = null;
+
+  // --- Fetching live rates ---
+  // EUR/PLN, USD/PLN and the gold price all come from NBP's free public
+  // Web API (no key needed). Silver isn't published by NBP, so it comes
+  // from a secondary source (Stooq) converted via the USD rate above —
+  // if that fetch fails (e.g. blocked by the browser), silver just shows
+  // as unavailable rather than breaking the rest of the page.
+
+  async function fetchNbpRates() {
+    const res = await fetch('https://api.nbp.pl/api/exchangerates/tables/A/?format=json');
+    if (!res.ok) throw new Error('NBP rates request failed');
+    const data = await res.json();
+    const rates = (data && data[0] && data[0].rates) || [];
+    const eur = rates.find((r) => r.code === 'EUR');
+    const usd = rates.find((r) => r.code === 'USD');
+    return {
+      eurPln: eur ? eur.mid : null,
+      usdPln: usd ? usd.mid : null,
+    };
+  }
+
+  async function fetchNbpGold() {
+    const res = await fetch('https://api.nbp.pl/api/cenyzlota/?format=json');
+    if (!res.ok) throw new Error('NBP gold request failed');
+    const data = await res.json();
+    const entry = Array.isArray(data) ? data[0] : null;
+    return entry ? entry.cena : null; // PLN per gram, 1000 fineness
+  }
+
+  async function fetchSilverPlnPerGram(usdPln) {
+    // Stooq's CSV endpoint isn't guaranteed to allow browser fetches from
+    // other origins — this is wrapped so a failure here doesn't break
+    // the rest of the Oszczędności section.
+    const res = await fetch('https://stooq.com/q/l/?s=xagusd&f=sd2t2c&h&e=csv');
+    if (!res.ok) throw new Error('Silver price request failed');
+    const text = await res.text();
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) throw new Error('Unexpected silver price format');
+    const cols = lines[1].split(',');
+    const usdPerOz = parseFloat(cols[cols.length - 1]);
+    if (!usdPln || isNaN(usdPerOz)) throw new Error('Could not compute silver price');
+    return (usdPerOz * usdPln) / OZ_TO_G;
+  }
+
+  async function loadRates() {
+    savingsRatesNote.textContent = 'Ładowanie kursów…';
+    savingsRatesNote.className = 'sync-note';
+
+    let eurPln = null, usdPln = null, goldPlnPerGram = null;
+    let anyError = false;
+
+    try {
+      const r = await fetchNbpRates();
+      eurPln = r.eurPln;
+      usdPln = r.usdPln;
+    } catch (e) {
+      console.error('Failed to fetch EUR/USD rates', e);
+      anyError = true;
+    }
+
+    try {
+      goldPlnPerGram = await fetchNbpGold();
+    } catch (e) {
+      console.error('Failed to fetch gold price', e);
+      anyError = true;
+    }
+
+    // Silver is skipped for now (see fetchSilverPlnPerGram above, kept
+    // dormant) — uncomment the block below to bring it back later.
+    // let silverPlnPerGram = null;
+    // try { silverPlnPerGram = await fetchSilverPlnPerGram(usdPln); } catch (e) {}
+
+    ratesState = {
+      eurPln, usdPln, goldPlnPerGram, silverPlnPerGram: null,
+      fetchedAt: Date.now(),
+      silverError: false,
+    };
+
+    const time = new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+    if (anyError) {
+      savingsRatesNote.textContent = `Część kursów nie została pobrana (spróbuj odświeżyć). Ostatnia próba: ${time}`;
+      savingsRatesNote.className = 'sync-note error';
+    } else {
+      savingsRatesNote.textContent = `Kursy zaktualizowane o ${time} (NBP)`;
+      savingsRatesNote.className = 'sync-note live';
+    }
+
+    renderSavings();
+  }
+
+  savingsRefreshRates.addEventListener('click', loadRates);
+
+  // --- Valuation ---
+
+  function savingsItemValuePln(item) {
+    if (item.kind === 'money') {
+      if (item.currency === 'PLN') return item.amount;
+      if (item.currency === 'EUR') return ratesState.eurPln ? item.amount * ratesState.eurPln : null;
+      if (item.currency === 'USD') return ratesState.usdPln ? item.amount * ratesState.usdPln : null;
+      return null;
+    }
+    // metal
+    const grams = item.unit === 'oz' ? item.amount * OZ_TO_G : item.amount;
+    const pricePerGram = item.metal === 'gold' ? ratesState.goldPlnPerGram : ratesState.silverPlnPerGram;
+    return pricePerGram ? grams * pricePerGram : null;
+  }
+
+  function savingsItemLabel(item) {
+    if (item.kind === 'money') {
+      return `${item.amount} ${CURRENCY_LABELS[item.currency] || item.currency}`;
+    }
+    return `${item.amount} ${item.unit === 'oz' ? 'oz' : 'g'} — ${METAL_LABELS[item.metal] || item.metal}`;
+  }
+
+  function renderSavings() {
+    // Summary cards: one per category, plus a grand total.
+    const categories = {
+      PLN: { label: 'Gotówka PLN', total: 0, hasAny: false },
+      EUR: { label: 'EUR (w PLN)', total: 0, hasAny: false },
+      USD: { label: 'USD (w PLN)', total: 0, hasAny: false },
+      gold: { label: 'Złoto (w PLN)', total: 0, hasAny: false },
+    };
+
+    let grandTotal = 0;
+    let anyMissingRate = false;
+
+    savingsItems.forEach((item) => {
+      const value = savingsItemValuePln(item);
+      const key = item.kind === 'money' ? item.currency : item.metal;
+      if (categories[key]) categories[key].hasAny = true;
+      if (value == null) {
+        anyMissingRate = true;
+        return;
+      }
+      if (categories[key]) categories[key].total += value;
+      grandTotal += value;
+    });
+
+    savingsGrandTotalEl.textContent = fmt(grandTotal);
+
+    savingsSummaryEl.innerHTML = '';
+    Object.values(categories)
+      .filter((c) => c.hasAny)
+      .forEach((c) => {
+        const card = document.createElement('div');
+        card.className = 'savings-summary-card';
+        card.innerHTML = `
+          <div>
+            <p class="savings-summary-label">${c.label}</p>
+            <p class="savings-summary-value">${fmt(c.total)}</p>
+          </div>
+        `;
+        savingsSummaryEl.appendChild(card);
+      });
+
+    if (anyMissingRate) {
+      const note = document.createElement('p');
+      note.className = 'sync-note error';
+      note.textContent = 'Niektóre pozycje nie są wliczone do sumy — brak aktualnego kursu.';
+      savingsSummaryEl.appendChild(note);
+    }
+
+    // Item list
+    savingsListEl.innerHTML = '';
+    savingsEmptyEl.classList.toggle('hidden', savingsItems.length !== 0);
+
+    savingsItems.forEach((item) => {
+      const value = savingsItemValuePln(item);
+      const row = document.createElement('div');
+      row.className = 'payment-row';
+      row.innerHTML = `
+        <div class="payment-top">
+          <div>
+            <p class="payment-name">${escapeHtml(savingsItemLabel(item))}</p>
+            <p class="payment-detail">${value != null ? '≈ ' + fmt(value) : 'brak kursu'}</p>
+          </div>
+        </div>
+        <div class="payment-actions">
+          <div class="action-btns">
+            <button class="savings-edit-btn" data-id="${item.id}">Edytuj</button>
+            <button class="savings-del-btn" data-id="${item.id}">Usuń</button>
+          </div>
+        </div>
+      `;
+      savingsListEl.appendChild(row);
+    });
+
+    savingsListEl.querySelectorAll('.savings-edit-btn').forEach((btn) =>
+      btn.addEventListener('click', () => editSavingsItem(btn.dataset.id))
+    );
+    savingsListEl.querySelectorAll('.savings-del-btn').forEach((btn) =>
+      btn.addEventListener('click', () => deleteSavingsItem(btn.dataset.id))
+    );
+  }
+
+  function selectSavingsKind(kind) {
+    selectedSavingsKind = kind;
+    savingsKindPicker.querySelectorAll('.savings-kind-btn').forEach((b) =>
+      b.classList.toggle('selected', b.dataset.kind === kind)
+    );
+    savingsMoneyFields.classList.toggle('hidden', kind !== 'money');
+    savingsMetalFields.classList.toggle('hidden', kind !== 'metal');
+  }
+
+  function selectSavingsUnit(unit) {
+    selectedSavingsUnit = unit;
+    savingsMetalFields.querySelectorAll('.savings-unit-btn').forEach((b) =>
+      b.classList.toggle('selected', b.dataset.unit === unit)
+    );
+    savingsGramAmountBlock.classList.toggle('hidden', unit !== 'g');
+    savingsOzPickerBlock.classList.toggle('hidden', unit !== 'oz');
+  }
+
+  function selectSavingsOz(oz) {
+    selectedSavingsOz = oz;
+    savingsOzPicker.querySelectorAll('.savings-oz-btn').forEach((b) =>
+      b.classList.toggle('selected', b.dataset.oz === String(oz))
+    );
+  }
+
+  savingsKindPicker.querySelectorAll('.savings-kind-btn').forEach((btn) => {
+    btn.addEventListener('click', () => selectSavingsKind(btn.dataset.kind));
+  });
+  savingsMetalFields.querySelectorAll('.savings-unit-btn').forEach((btn) => {
+    btn.addEventListener('click', () => selectSavingsUnit(btn.dataset.unit));
+  });
+  savingsOzPicker.querySelectorAll('.savings-oz-btn').forEach((btn) => {
+    btn.addEventListener('click', () => selectSavingsOz(parseFloat(btn.dataset.oz)));
+  });
+
+  function editSavingsItem(id) {
+    const item = savingsItems.find((x) => x.id === id);
+    if (!item) return;
+    editingSavingsId = id;
+    selectSavingsKind(item.kind);
+    if (item.kind === 'money') {
+      sCurrency.value = item.currency;
+      sMoneyAmount.value = item.amount;
+    } else {
+      selectSavingsUnit(item.unit);
+      if (item.unit === 'oz') {
+        selectSavingsOz(item.amount);
+      } else {
+        sMetalAmount.value = item.amount;
+      }
+    }
+    savingsError.classList.add('hidden');
+    savingsForm.classList.remove('hidden');
+    savingsSave.textContent = 'Zapisz zmiany';
+  }
+
+  function resetSavingsForm() {
+    editingSavingsId = null;
+    selectSavingsKind('money');
+    sCurrency.value = 'PLN';
+    sMoneyAmount.value = '';
+    selectSavingsUnit('g');
+    sMetalAmount.value = '';
+    selectedSavingsOz = null;
+    savingsOzPicker.querySelectorAll('.savings-oz-btn').forEach((b) => b.classList.remove('selected'));
+    savingsError.classList.add('hidden');
+    savingsSave.textContent = 'Zapisz';
+  }
+
+  function deleteSavingsItem(id) {
+    savingsItems = savingsItems.filter((i) => i.id !== id);
+    renderSavings();
+    saveSavings();
+  }
+
+  savingsAddBtn.addEventListener('click', () => {
+    const willShow = savingsForm.classList.contains('hidden');
+    if (willShow) resetSavingsForm();
+    savingsForm.classList.toggle('hidden');
+  });
+
+  savingsCancel.addEventListener('click', () => {
+    savingsForm.classList.add('hidden');
+    resetSavingsForm();
+  });
+
+  savingsSave.addEventListener('click', () => {
+    let item;
+    if (selectedSavingsKind === 'money') {
+      const amount = parseFloat(sMoneyAmount.value);
+      if (isNaN(amount) || amount < 0) {
+        savingsError.textContent = 'Podaj prawidłową kwotę.';
+        savingsError.classList.remove('hidden');
+        return;
+      }
+      item = { kind: 'money', currency: sCurrency.value, amount };
+    } else if (selectedSavingsUnit === 'oz') {
+      if (selectedSavingsOz == null) {
+        savingsError.textContent = 'Wybierz ilość uncji.';
+        savingsError.classList.remove('hidden');
+        return;
+      }
+      item = { kind: 'metal', metal: 'gold', unit: 'oz', amount: selectedSavingsOz };
+    } else {
+      const amount = parseFloat(sMetalAmount.value);
+      if (isNaN(amount) || amount < 0) {
+        savingsError.textContent = 'Podaj prawidłową ilość.';
+        savingsError.classList.remove('hidden');
+        return;
+      }
+      item = { kind: 'metal', metal: 'gold', unit: 'g', amount };
+    }
+    savingsError.classList.add('hidden');
+
+    if (editingSavingsId) {
+      savingsItems = savingsItems.map((i) => (i.id === editingSavingsId ? { ...item, id: i.id } : i));
+    } else {
+      item.id = 'sv' + Date.now() + Math.random().toString(36).slice(2, 7);
+      savingsItems.push(item);
+    }
+
+    savingsForm.classList.add('hidden');
+    resetSavingsForm();
+    renderSavings();
+    saveSavings();
+  });
+
   // --- Login / logout ---
 
   function showApp() {
@@ -1767,9 +2162,16 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     }
   });
 
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
       showApp();
+      // Resolve push registration (if applicable) BEFORE the data
+      // listeners attach — otherwise the first checkAndNotify/
+      // checkTrashNotify call can race ahead of pushActive being set,
+      // firing a local notification that then duplicates the push.
+      if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
+        await registerPush();
+      }
       attachDataListeners();
     } else {
       showLogin();
@@ -1790,9 +2192,6 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       navigator.serviceWorker.register('service-worker.js').catch(() => {
         // Non-fatal: app still works fully without the service worker.
       });
-      if ('Notification' in window && Notification.permission === 'granted') {
-        registerPush();
-      }
     }
   }
 
