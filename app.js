@@ -115,7 +115,8 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const shoppingAddOgolne = document.getElementById('shopping-add-ogolne');
   const shoppingAddComiesieczne = document.getElementById('shopping-add-comiesieczne');
   const shoppingTypeComiesieczne = document.getElementById('shopping-type-comiesieczne');
-  const shoppingItemsOgolne = document.getElementById('shopping-items-ogolne');
+  const shoppingItemsOgolneUnchecked = document.getElementById('shopping-items-ogolne-unchecked');
+  const shoppingItemsOgolneChecked = document.getElementById('shopping-items-ogolne-checked');
   const shoppingItemsComiesieczne = document.getElementById('shopping-items-comiesieczne');
   const shoppingEmptyOgolne = document.getElementById('shopping-empty-ogolne');
   const shoppingEmptyComiesieczne = document.getElementById('shopping-empty-comiesieczne');
@@ -1071,7 +1072,8 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   const SHOPPING_LISTS = {
     ogolne: {
-      items: shoppingItemsOgolne,
+      itemsUnchecked: shoppingItemsOgolneUnchecked,
+      itemsChecked: shoppingItemsOgolneChecked,
       empty: shoppingEmptyOgolne,
       input: shoppingInputOgolne,
       addBtn: shoppingAddOgolne,
@@ -1142,7 +1144,6 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   function renderShoppingList(listName) {
     const refs = SHOPPING_LISTS[listName];
     const items = shoppingItems[listName] || [];
-    refs.items.innerHTML = '';
     refs.empty.classList.toggle('hidden', items.length !== 0);
 
     const uncheckedOgolne = shoppingItems.ogolne.filter((i) => !i.checked).length;
@@ -1151,6 +1152,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     shoppingCountComiesiecznEl.textContent = String(uncheckedComiesieczne);
 
     if (listName === 'comiesieczne') {
+      refs.items.innerHTML = '';
       // Grouped presentation by type, per the "selecting type" flow.
       const byType = {};
       items.forEach((item) => {
@@ -1174,16 +1176,25 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
         });
       });
     } else {
-      // Unchecked items first, checked items sink to the bottom — each
-      // group keeps its own manual order, and dragging/▲▼ stays scoped
-      // within its group so a checked item can't jump above an unchecked
-      // one just by moving up.
+      // Unchecked and checked items live in two entirely separate
+      // containers — not just a visual grouping, but two independent
+      // drag zones, so an item can never be dragged from one into the
+      // other (uncheck it first if you want that).
+      refs.itemsUnchecked.innerHTML = '';
+      refs.itemsChecked.innerHTML = '';
+
       const unchecked = items.filter((i) => !i.checked).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       const checked = items.filter((i) => i.checked).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      [...unchecked, ...checked].forEach((item) => {
+
+      unchecked.forEach((item) => {
         const row = renderChecklistRow(item, listName, true);
         wireChecklistRow(row, listName);
-        refs.items.appendChild(row);
+        refs.itemsUnchecked.appendChild(row);
+      });
+      checked.forEach((item) => {
+        const row = renderChecklistRow(item, listName, true);
+        wireChecklistRow(row, listName);
+        refs.itemsChecked.appendChild(row);
       });
     }
   }
@@ -1253,90 +1264,37 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     saveShopping();
   }
 
-  // --- Drag-and-drop reordering (mouse + touch, via Pointer Events) ---
-  // Scoped by data-groupkey so a drag can't cross from unchecked into
-  // checked (or vice versa) — same boundary the ▲/▼ buttons respect.
-  // Currently wired up for "Ogólne" only.
+  // --- Drag-and-drop reordering (SortableJS, mouse + touch) ---
+  // Each container (unchecked / checked) is its own independent Sortable
+  // instance, so an item can never be dragged from one into the other —
+  // uncheck it first if you want it to move between the two lists.
 
-  function getShoppingDragAfterElement(container, y, draggingEl) {
-    const key = draggingEl.dataset.groupkey || '';
-    const candidates = [...container.querySelectorAll('.checklist-item')].filter(
-      (el) => el !== draggingEl && (el.dataset.groupkey || '') === key
-    );
-    return candidates.reduce(
-      (closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-          return { offset, element: child };
-        }
-        return closest;
-      },
-      { offset: -Infinity, element: null }
-    ).element;
-  }
-
-  function commitShoppingOrderFromDom(container, listName) {
+  function commitOgolneOrder(container) {
     const rows = [...container.querySelectorAll('.checklist-item')];
-    const groupCounters = {};
     const updates = {};
-    rows.forEach((row) => {
-      const key = row.dataset.groupkey || '';
-      if (groupCounters[key] === undefined) groupCounters[key] = 0;
-      updates[row.dataset.id] = groupCounters[key]++;
+    rows.forEach((row, index) => {
+      updates[row.dataset.id] = index;
     });
-    shoppingItems[listName] = shoppingItems[listName].map((i) => ({
-      ...i,
-      order: updates[i.id] !== undefined ? updates[i.id] : (i.order ?? 0),
-    }));
-    renderShoppingList(listName);
+    shoppingItems.ogolne = shoppingItems.ogolne.map((i) =>
+      updates[i.id] !== undefined ? { ...i, order: updates[i.id] } : i
+    );
     saveShopping();
   }
 
-  function attachShoppingDragHandlers(container, listName) {
-    let draggingEl = null;
-
-    container.addEventListener('pointerdown', (e) => {
-      const handle = e.target.closest('.drag-handle');
-      if (!handle) return;
-      const row = handle.closest('.checklist-item');
-      if (!row) return;
-      e.preventDefault();
-
-      draggingEl = row;
-      row.classList.add('dragging');
-      handle.setPointerCapture(e.pointerId);
-
-      const onMove = (moveEvent) => {
-        if (!draggingEl) return;
-        const afterElement = getShoppingDragAfterElement(container, moveEvent.clientY, draggingEl);
-        if (afterElement == null) {
-          const key = draggingEl.dataset.groupkey || '';
-          const sameGroup = [...container.querySelectorAll('.checklist-item')].filter(
-            (el) => (el.dataset.groupkey || '') === key
-          );
-          const last = sameGroup[sameGroup.length - 1];
-          if (last && last !== draggingEl) last.after(draggingEl);
-        } else {
-          container.insertBefore(draggingEl, afterElement);
-        }
-      };
-
-      const onUp = (upEvent) => {
-        handle.releasePointerCapture(upEvent.pointerId);
-        handle.removeEventListener('pointermove', onMove);
-        handle.removeEventListener('pointerup', onUp);
-        row.classList.remove('dragging');
-        draggingEl = null;
-        commitShoppingOrderFromDom(container, listName);
-      };
-
-      handle.addEventListener('pointermove', onMove);
-      handle.addEventListener('pointerup', onUp);
+  if (typeof Sortable !== 'undefined') {
+    Sortable.create(shoppingItemsOgolneUnchecked, {
+      handle: '.drag-handle',
+      animation: 150,
+      onEnd: () => commitOgolneOrder(shoppingItemsOgolneUnchecked),
     });
+    Sortable.create(shoppingItemsOgolneChecked, {
+      handle: '.drag-handle',
+      animation: 150,
+      onEnd: () => commitOgolneOrder(shoppingItemsOgolneChecked),
+    });
+  } else {
+    console.error('SortableJS failed to load — drag reordering unavailable, ▲/▼ buttons still work.');
   }
-
-  attachShoppingDragHandlers(shoppingItemsOgolne, 'ogolne');
 
   shoppingAddOgolne.addEventListener('click', () => addShoppingItem('ogolne'));
   shoppingAddComiesieczne.addEventListener('click', () => addShoppingItem('comiesieczne'));

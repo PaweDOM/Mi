@@ -146,7 +146,8 @@
           <input type="text" id="shopping-input-ogolne" placeholder="Dodaj produkt…" />
           <button id="shopping-add-ogolne" class="primary">Dodaj</button>
         </div>
-        <div id="shopping-items-ogolne" class="checklist"></div>
+        <div id="shopping-items-ogolne-unchecked" class="checklist"></div>
+        <div id="shopping-items-ogolne-checked" class="checklist" style="margin-top:10px;"></div>
         <p id="shopping-empty-ogolne" class="empty hidden">Lista jest pusta.</p>
       </div>
 
@@ -341,6 +342,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>
