@@ -1098,12 +1098,21 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     return Math.max(...items.map((i) => i.order ?? 0)) + 1;
   }
 
-  function renderChecklistRow(item) {
+  // For "comiesieczne" the group is its type; for "ogolne" it's simply
+  // checked vs unchecked (so checked items sink to the bottom and stay
+  // reorderable only among themselves, same for unchecked).
+  function shoppingGroupKey(listName, item) {
+    if (listName === 'comiesieczne') return item.type || 'inne';
+    return item.checked ? 'checked' : 'unchecked';
+  }
+
+  function renderChecklistRow(item, listName, withDragHandle) {
     const row = document.createElement('div');
     row.className = 'checklist-item' + (item.checked ? ' checked' : '');
     row.dataset.id = item.id;
-    row.dataset.type = item.type || '';
+    row.dataset.groupkey = shoppingGroupKey(listName, item);
     row.innerHTML = `
+      ${withDragHandle ? '<span class="drag-handle" title="Przeciągnij, aby zmienić kolejność">⠿</span>' : ''}
       <input type="checkbox" ${item.checked ? 'checked' : ''} data-id="${item.id}" />
       <span class="checklist-item-text">${escapeHtml(item.text)}</span>
       <div class="move-btns">
@@ -1159,15 +1168,20 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
         const groupSorted = [...byType[type]].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         groupSorted.forEach((item) => {
-          const row = renderChecklistRow(item);
+          const row = renderChecklistRow(item, listName, false);
           wireChecklistRow(row, listName);
           refs.items.appendChild(row);
         });
       });
     } else {
-      const sorted = [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      sorted.forEach((item) => {
-        const row = renderChecklistRow(item);
+      // Unchecked items first, checked items sink to the bottom — each
+      // group keeps its own manual order, and dragging/▲▼ stays scoped
+      // within its group so a checked item can't jump above an unchecked
+      // one just by moving up.
+      const unchecked = items.filter((i) => !i.checked).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const checked = items.filter((i) => i.checked).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      [...unchecked, ...checked].forEach((item) => {
+        const row = renderChecklistRow(item, listName, true);
         wireChecklistRow(row, listName);
         refs.items.appendChild(row);
       });
@@ -1207,17 +1221,18 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     saveShopping();
   }
 
-  // Moves an item up/down. For "comiesieczne", movement stays within the
-  // same type group, matching how the list is presented (grouped by type).
+  // Moves an item up/down within its own group — the type group for
+  // "comiesieczne", or the checked/unchecked group for "ogolne" (so a
+  // checked item can't be moved back above the unchecked ones this way).
   function moveShoppingItem(listName, id, direction) {
     const items = shoppingItems[listName];
     const item = items.find((i) => i.id === id);
     if (!item) return;
 
-    const siblings = (listName === 'comiesieczne'
-      ? items.filter((i) => (i.type || 'inne') === (item.type || 'inne'))
-      : items
-    ).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const key = shoppingGroupKey(listName, item);
+    const siblings = items
+      .filter((i) => shoppingGroupKey(listName, i) === key)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
     const idx = siblings.findIndex((i) => i.id === id);
     const swapIdx = idx + direction;
@@ -1237,6 +1252,91 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     renderShoppingList(listName);
     saveShopping();
   }
+
+  // --- Drag-and-drop reordering (mouse + touch, via Pointer Events) ---
+  // Scoped by data-groupkey so a drag can't cross from unchecked into
+  // checked (or vice versa) — same boundary the ▲/▼ buttons respect.
+  // Currently wired up for "Ogólne" only.
+
+  function getShoppingDragAfterElement(container, y, draggingEl) {
+    const key = draggingEl.dataset.groupkey || '';
+    const candidates = [...container.querySelectorAll('.checklist-item')].filter(
+      (el) => el !== draggingEl && (el.dataset.groupkey || '') === key
+    );
+    return candidates.reduce(
+      (closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset, element: child };
+        }
+        return closest;
+      },
+      { offset: -Infinity, element: null }
+    ).element;
+  }
+
+  function commitShoppingOrderFromDom(container, listName) {
+    const rows = [...container.querySelectorAll('.checklist-item')];
+    const groupCounters = {};
+    const updates = {};
+    rows.forEach((row) => {
+      const key = row.dataset.groupkey || '';
+      if (groupCounters[key] === undefined) groupCounters[key] = 0;
+      updates[row.dataset.id] = groupCounters[key]++;
+    });
+    shoppingItems[listName] = shoppingItems[listName].map((i) => ({
+      ...i,
+      order: updates[i.id] !== undefined ? updates[i.id] : (i.order ?? 0),
+    }));
+    renderShoppingList(listName);
+    saveShopping();
+  }
+
+  function attachShoppingDragHandlers(container, listName) {
+    let draggingEl = null;
+
+    container.addEventListener('pointerdown', (e) => {
+      const handle = e.target.closest('.drag-handle');
+      if (!handle) return;
+      const row = handle.closest('.checklist-item');
+      if (!row) return;
+      e.preventDefault();
+
+      draggingEl = row;
+      row.classList.add('dragging');
+      handle.setPointerCapture(e.pointerId);
+
+      const onMove = (moveEvent) => {
+        if (!draggingEl) return;
+        const afterElement = getShoppingDragAfterElement(container, moveEvent.clientY, draggingEl);
+        if (afterElement == null) {
+          const key = draggingEl.dataset.groupkey || '';
+          const sameGroup = [...container.querySelectorAll('.checklist-item')].filter(
+            (el) => (el.dataset.groupkey || '') === key
+          );
+          const last = sameGroup[sameGroup.length - 1];
+          if (last && last !== draggingEl) last.after(draggingEl);
+        } else {
+          container.insertBefore(draggingEl, afterElement);
+        }
+      };
+
+      const onUp = (upEvent) => {
+        handle.releasePointerCapture(upEvent.pointerId);
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        row.classList.remove('dragging');
+        draggingEl = null;
+        commitShoppingOrderFromDom(container, listName);
+      };
+
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+    });
+  }
+
+  attachShoppingDragHandlers(shoppingItemsOgolne, 'ogolne');
 
   shoppingAddOgolne.addEventListener('click', () => addShoppingItem('ogolne'));
   shoppingAddComiesieczne.addEventListener('click', () => addShoppingItem('comiesieczne'));
