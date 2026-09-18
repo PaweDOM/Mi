@@ -1285,11 +1285,19 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     Sortable.create(shoppingItemsOgolneUnchecked, {
       handle: '.drag-handle',
       animation: 150,
+      forceFallback: true,
+      fallbackTolerance: 3,
+      delay: 150,
+      delayOnTouchOnly: true,
       onEnd: () => commitOgolneOrder(shoppingItemsOgolneUnchecked),
     });
     Sortable.create(shoppingItemsOgolneChecked, {
       handle: '.drag-handle',
       animation: 150,
+      forceFallback: true,
+      fallbackTolerance: 3,
+      delay: 150,
+      delayOnTouchOnly: true,
       onEnd: () => commitOgolneOrder(shoppingItemsOgolneChecked),
     });
   } else {
