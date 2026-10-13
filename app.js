@@ -119,6 +119,20 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const shoppingItemsOgolneChecked = document.getElementById('shopping-items-ogolne-checked');
   const shoppingItemsComiesieczne = document.getElementById('shopping-items-comiesieczne');
   const shoppingEmptyOgolne = document.getElementById('shopping-empty-ogolne');
+  const shoppingClearRowOgolne = document.getElementById('shopping-clear-row-ogolne');
+  const shoppingClearOgolne = document.getElementById('shopping-clear-ogolne');
+
+  // "Internetowe" — same structure as "Ogólne"
+  const shoppingCountInternetoweEl = document.getElementById('shopping-count-internetowe');
+  const shoppingTabInternetowe = document.getElementById('shopping-tab-internetowe');
+  const shoppingListInternetowe = document.getElementById('shopping-list-internetowe');
+  const shoppingInputInternetowe = document.getElementById('shopping-input-internetowe');
+  const shoppingAddInternetowe = document.getElementById('shopping-add-internetowe');
+  const shoppingItemsInternetoweUnchecked = document.getElementById('shopping-items-internetowe-unchecked');
+  const shoppingItemsInternetoweChecked = document.getElementById('shopping-items-internetowe-checked');
+  const shoppingEmptyInternetowe = document.getElementById('shopping-empty-internetowe');
+  const shoppingClearRowInternetowe = document.getElementById('shopping-clear-row-internetowe');
+  const shoppingClearInternetowe = document.getElementById('shopping-clear-internetowe');
   const shoppingEmptyComiesieczne = document.getElementById('shopping-empty-comiesieczne');
 
   // --- Pantry (Składzik) elements ---
@@ -225,6 +239,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     navSavings.classList.toggle('active', name === 'savings');
     if (name === 'shopping') {
       renderShoppingList('ogolne');
+      renderShoppingList('internetowe');
       renderShoppingList('comiesieczne');
     }
     if (name === 'pantry') renderPantry();
@@ -344,7 +359,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
   let pantryItems = [];
   let trashDates = [];
-  let shoppingItems = { ogolne: [], comiesieczne: [] };
+  let shoppingItems = { ogolne: [], internetowe: [], comiesieczne: [] };
   let savingsItems = [];
   let ratesState = { eurPln: null, usdPln: null, goldPlnPerGram: null, silverPlnPerGram: null, fetchedAt: null, silverError: false };
 
@@ -368,12 +383,14 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
         const val = snapshot.val() || {};
         shoppingItems = {
           ogolne: objToArray(val.ogolne),
+          internetowe: objToArray(val.internetowe),
           comiesieczne: objToArray(val.comiesieczne),
         };
         firebaseReady.shopping = true;
         markConnected();
         if (!sectionShopping.classList.contains('hidden')) {
           renderShoppingList('ogolne');
+          renderShoppingList('internetowe');
           renderShoppingList('comiesieczne');
         }
       },
@@ -499,6 +516,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     try {
       await dbSet(shoppingRef, {
         ogolne: paymentsToObj(shoppingItems.ogolne),
+        internetowe: paymentsToObj(shoppingItems.internetowe),
         comiesieczne: paymentsToObj(shoppingItems.comiesieczne),
       });
     } catch (e) {
@@ -765,14 +783,22 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     updateNotifBanner();
   });
 
+  function dueLabelPl(d) {
+    if (d < 0) return 'zaległa';
+    if (d === 0) return 'dziś';
+    if (d === 1) return 'jutro';
+    return `za ${d} dni`;
+  }
+
   function checkAndNotify() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     // Push notifications (server-side) already cover this device — firing
     // our own local notification too would duplicate it.
     if (pushActive) return;
     const todayStr = new Date().toDateString();
-    let changed = false;
 
+    // One combined notification instead of one per payment.
+    const due = [];
     payments.forEach((p) => {
       const paidKey = occurrenceKey(p);
       if (paidStatus[paidKey]) return;
@@ -782,14 +808,19 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       const notifKey = `${paidKey}:notified`;
 
       if (d <= leadTime && lastNotified[notifKey] !== todayStr) {
-        const label = d <= 0 ? (d === 0 ? 'termin dziś' : 'zaległa płatność') : `termin za ${d} ${d === 1 ? 'dzień' : 'dni'}`;
-        new Notification(p.name, { body: `${fmt(p.amount)} ${label}.` });
-        lastNotified[notifKey] = todayStr;
-        changed = true;
+        due.push({ p, d, notifKey });
       }
     });
 
-    if (changed) saveLastNotified();
+    if (due.length === 0) return;
+    due.sort((a, b) => a.d - b.d);
+    const title = due.length === 1 ? 'Nadchodząca płatność' : `Nadchodzące płatności (${due.length})`;
+    const body = due.map(({ p, d }) => `${p.name} — ${fmt(p.amount)} (${dueLabelPl(d)})`).join('\n');
+    new Notification(title, { body });
+    due.forEach(({ notifKey }) => {
+      lastNotified[notifKey] = todayStr;
+    });
+    saveLastNotified();
   }
 
   // --- Status / rendering ---
@@ -813,7 +844,16 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     emptyEl.classList.toggle('hidden', visible.length !== 0);
 
     let total = 0;
-    const sorted = [...visible].sort((a, b) => daysUntilPayment(a) - daysUntilPayment(b));
+    // Unpaid first (by nearest due date), paid ones sink to the bottom. Once
+    // the cycle rolls over (next occurrence's key isn't marked paid), the
+    // payment is "unpaid" again and returns to the active part of the list.
+    const isPaidNow = (p) => !!paidStatus[occurrenceKey(p)];
+    const sorted = [...visible].sort((a, b) => {
+      const pa = isPaidNow(a);
+      const pb = isPaidNow(b);
+      if (pa !== pb) return pa ? 1 : -1;
+      return daysUntilPayment(a) - daysUntilPayment(b);
+    });
 
     sorted.forEach((p) => {
       total += Number(p.amount);
@@ -1077,6 +1117,17 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       empty: shoppingEmptyOgolne,
       input: shoppingInputOgolne,
       addBtn: shoppingAddOgolne,
+      clearRow: shoppingClearRowOgolne,
+      clearBtn: shoppingClearOgolne,
+    },
+    internetowe: {
+      itemsUnchecked: shoppingItemsInternetoweUnchecked,
+      itemsChecked: shoppingItemsInternetoweChecked,
+      empty: shoppingEmptyInternetowe,
+      input: shoppingInputInternetowe,
+      addBtn: shoppingAddInternetowe,
+      clearRow: shoppingClearRowInternetowe,
+      clearBtn: shoppingClearInternetowe,
     },
     comiesieczne: {
       items: shoppingItemsComiesieczne,
@@ -1147,9 +1198,19 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     refs.empty.classList.toggle('hidden', items.length !== 0);
 
     const uncheckedOgolne = shoppingItems.ogolne.filter((i) => !i.checked).length;
+    const uncheckedInternetowe = shoppingItems.internetowe.filter((i) => !i.checked).length;
     const uncheckedComiesieczne = shoppingItems.comiesieczne.filter((i) => !i.checked).length;
     shoppingCountOgolneEl.textContent = String(uncheckedOgolne);
+    shoppingCountInternetoweEl.textContent = String(uncheckedInternetowe);
     shoppingCountComiesiecznEl.textContent = String(uncheckedComiesieczne);
+
+    // "Usuń odznaczone" is only offered when something is actually checked
+    // (and never for "Co miesięczne").
+    if (refs.clearRow) {
+      const checkedCount = items.filter((i) => i.checked).length;
+      refs.clearRow.classList.toggle('hidden', checkedCount === 0);
+      refs.clearBtn.textContent = `Usuń odznaczone (${checkedCount})`;
+    }
 
     if (listName === 'comiesieczne') {
       refs.items.innerHTML = '';
@@ -1216,6 +1277,18 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     refs.input.value = '';
     renderShoppingList(listName);
     saveShopping();
+    // Keep the cursor in the field so the phone keyboard stays open until
+    // the user closes it themselves.
+    refs.input.focus();
+  }
+
+  function clearCheckedShopping(listName) {
+    const checkedCount = shoppingItems[listName].filter((i) => i.checked).length;
+    if (checkedCount === 0) return;
+    if (!window.confirm(`Usunąć odznaczone pozycje (${checkedCount})?`)) return;
+    shoppingItems[listName] = shoppingItems[listName].filter((i) => !i.checked);
+    renderShoppingList(listName);
+    saveShopping();
   }
 
   function toggleShoppingItem(listName, id) {
@@ -1269,62 +1342,69 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   // instance, so an item can never be dragged from one into the other —
   // uncheck it first if you want it to move between the two lists.
 
-  function commitOgolneOrder(container) {
+  function commitChecklistOrder(container, listName) {
     const rows = [...container.querySelectorAll('.checklist-item')];
     const updates = {};
     rows.forEach((row, index) => {
       updates[row.dataset.id] = index;
     });
-    shoppingItems.ogolne = shoppingItems.ogolne.map((i) =>
+    shoppingItems[listName] = shoppingItems[listName].map((i) =>
       updates[i.id] !== undefined ? { ...i, order: updates[i.id] } : i
     );
     saveShopping();
   }
 
-  if (typeof Sortable !== 'undefined') {
-    Sortable.create(shoppingItemsOgolneUnchecked, {
+  function makeSortable(container, listName) {
+    Sortable.create(container, {
       handle: '.drag-handle',
       animation: 150,
       forceFallback: true,
       fallbackTolerance: 3,
       delay: 150,
       delayOnTouchOnly: true,
-      onEnd: () => commitOgolneOrder(shoppingItemsOgolneUnchecked),
+      onEnd: () => commitChecklistOrder(container, listName),
     });
-    Sortable.create(shoppingItemsOgolneChecked, {
-      handle: '.drag-handle',
-      animation: 150,
-      forceFallback: true,
-      fallbackTolerance: 3,
-      delay: 150,
-      delayOnTouchOnly: true,
-      onEnd: () => commitOgolneOrder(shoppingItemsOgolneChecked),
+  }
+
+  if (typeof Sortable !== 'undefined') {
+    ['ogolne', 'internetowe'].forEach((listName) => {
+      makeSortable(SHOPPING_LISTS[listName].itemsUnchecked, listName);
+      makeSortable(SHOPPING_LISTS[listName].itemsChecked, listName);
     });
   } else {
     console.error('SortableJS failed to load — drag reordering unavailable, ▲/▼ buttons still work.');
   }
 
-  shoppingAddOgolne.addEventListener('click', () => addShoppingItem('ogolne'));
-  shoppingAddComiesieczne.addEventListener('click', () => addShoppingItem('comiesieczne'));
-  shoppingInputOgolne.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') addShoppingItem('ogolne');
-  });
-  shoppingInputComiesieczne.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') addShoppingItem('comiesieczne');
+  // Add buttons + Enter key. The mousedown handler stops the button from
+  // stealing focus from the text field (which is what closes the phone
+  // keyboard after every added item); addShoppingItem also re-focuses it.
+  Object.keys(SHOPPING_LISTS).forEach((listName) => {
+    const refs = SHOPPING_LISTS[listName];
+    refs.addBtn.addEventListener('mousedown', (e) => e.preventDefault());
+    refs.addBtn.addEventListener('click', () => addShoppingItem(listName));
+    refs.input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addShoppingItem(listName);
+    });
+    if (refs.clearBtn) {
+      refs.clearBtn.addEventListener('click', () => clearCheckedShopping(listName));
+    }
   });
 
-  shoppingTabOgolne.addEventListener('click', () => {
-    shoppingTabOgolne.classList.add('active');
-    shoppingTabComiesieczne.classList.remove('active');
-    shoppingListOgolne.classList.remove('hidden');
-    shoppingListComiesieczne.classList.add('hidden');
-  });
+  const SHOPPING_TABS = {
+    ogolne: { tab: shoppingTabOgolne, panel: shoppingListOgolne },
+    internetowe: { tab: shoppingTabInternetowe, panel: shoppingListInternetowe },
+    comiesieczne: { tab: shoppingTabComiesieczne, panel: shoppingListComiesieczne },
+  };
 
-  shoppingTabComiesieczne.addEventListener('click', () => {
-    shoppingTabComiesieczne.classList.add('active');
-    shoppingTabOgolne.classList.remove('active');
-    shoppingListComiesieczne.classList.remove('hidden');
-    shoppingListOgolne.classList.add('hidden');
+  function showShoppingTab(name) {
+    Object.keys(SHOPPING_TABS).forEach((key) => {
+      SHOPPING_TABS[key].tab.classList.toggle('active', key === name);
+      SHOPPING_TABS[key].panel.classList.toggle('hidden', key !== name);
+    });
+  }
+
+  Object.keys(SHOPPING_TABS).forEach((key) => {
+    SHOPPING_TABS[key].tab.addEventListener('click', () => showShoppingTab(key));
   });
 
   // ============================= SKŁADZIK (Pantry) =============================

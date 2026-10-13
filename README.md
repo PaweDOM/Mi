@@ -37,6 +37,11 @@ in with the household password sees the same live data.
 - See at a glance which bills are overdue, due soon, or paid
 - Mark a bill as paid for its current cycle
 - Amounts shown in PLN
+- Reminders are combined: one notification listing every payment that is
+  currently within its "remind me X days before" window (e.g. "Internet —
+  120,00 zł (za 2 dni)"), instead of one notification per payment
+- Paid payments sink to the bottom of the list; once the cycle rolls over
+  they count as unpaid again and move back up among the active ones
 - Browser notifications, checked hourly and whenever the tab regains focus
 
 Note: a monthly bill is due every month on its chosen day. A bi-monthly
@@ -46,19 +51,22 @@ there.
 
 ## Lista zakupów (Shopping list)
 
-- Two independent checklists: "Ogólne" (general) and "Co miesięczne"
-  (monthly recurring shopping)
-- Add an item, check it off, or delete it
-- "Ogólne": checked items automatically sink to the bottom of the list —
-  unchecked and checked items live in two entirely separate lists under
-  the hood, so drag reordering (via the ⠿ handle, mouse or finger,
-  powered by the SortableJS library) or the ▲/▼ buttons can never
-  accidentally move an item between the two groups; uncheck it first if
-  you want that
+- Three checklists: "Ogólne" (general), "Internetowe" (online) and
+  "Co miesięczne" (monthly recurring shopping)
+- Add an item, check it off, or delete it. On a phone, the keyboard stays
+  open after adding an item until you close it yourself
+- "Ogólne" and "Internetowe" behave identically: checked items sink to
+  the bottom (two separate lists under the hood), and you can reorder
+  with the ⠿ handle (mouse or finger, via SortableJS) or the ▲/▼ buttons.
+  Items can never move between the checked and unchecked groups by
+  reordering; uncheck first if you want that
+- "Usuń odznaczone" (Ogólne and Internetowe only) removes all checked
+  items at once, after a confirmation. It only appears when something is
+  checked
 - "Co miesięczne" items also get a type: Dom, Kaziczek, Rosa, or Inne —
   the list is presented grouped under those headings, and the ▲/▼
-  buttons move an item within its own type group rather than the whole
-  list (no drag handle here, ▲/▼ only)
+  buttons move an item within its own type group (no drag handle, no
+  bulk delete here)
 - Each list shows its own separate unchecked-item count in the header
 - No notifications for this section
 

@@ -813,3 +813,28 @@ button.text-btn {
   font-weight: 600;
   margin: 2px 0 0;
 }
+
+/* --- "Usuń odznaczone" (clear checked items) --- */
+
+.checklist-clear-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.checklist-clear-row.hidden {
+  display: none;
+}
+
+.clear-checked-btn {
+  border: 1px solid #e5c4c4;
+  background: #fff;
+  color: #a32d2d;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 8px;
+}
+
+.clear-checked-btn:hover {
+  background: #fcebeb;
+}

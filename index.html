@@ -131,6 +131,10 @@
           <p class="total" id="shopping-count-ogolne">0</p>
         </div>
         <div>
+          <p class="label">Internetowe</p>
+          <p class="total" id="shopping-count-internetowe">0</p>
+        </div>
+        <div>
           <p class="label">Co miesięczne</p>
           <p class="total" id="shopping-count-comiesieczne">0</p>
         </div>
@@ -138,6 +142,7 @@
 
       <div class="tabs">
         <button id="shopping-tab-ogolne" class="tab active">Ogólne</button>
+        <button id="shopping-tab-internetowe" class="tab">Internetowe</button>
         <button id="shopping-tab-comiesieczne" class="tab">Co miesięczne</button>
       </div>
 
@@ -147,8 +152,24 @@
           <button id="shopping-add-ogolne" class="primary">Dodaj</button>
         </div>
         <div id="shopping-items-ogolne-unchecked" class="checklist"></div>
+        <div id="shopping-clear-row-ogolne" class="checklist-clear-row hidden">
+          <button id="shopping-clear-ogolne" class="clear-checked-btn">Usuń odznaczone</button>
+        </div>
         <div id="shopping-items-ogolne-checked" class="checklist" style="margin-top:10px;"></div>
         <p id="shopping-empty-ogolne" class="empty hidden">Lista jest pusta.</p>
+      </div>
+
+      <div id="shopping-list-internetowe" class="checklist-panel hidden">
+        <div class="checklist-add-row">
+          <input type="text" id="shopping-input-internetowe" placeholder="Dodaj produkt…" />
+          <button id="shopping-add-internetowe" class="primary">Dodaj</button>
+        </div>
+        <div id="shopping-items-internetowe-unchecked" class="checklist"></div>
+        <div id="shopping-clear-row-internetowe" class="checklist-clear-row hidden">
+          <button id="shopping-clear-internetowe" class="clear-checked-btn">Usuń odznaczone</button>
+        </div>
+        <div id="shopping-items-internetowe-checked" class="checklist" style="margin-top:10px;"></div>
+        <p id="shopping-empty-internetowe" class="empty hidden">Lista jest pusta.</p>
       </div>
 
       <div id="shopping-list-comiesieczne" class="checklist-panel hidden">
