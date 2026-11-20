@@ -2,8 +2,8 @@ name: Kursy ETF i akcji
 
 on:
   schedule:
-    # co 2 godziny w dni robocze, ok. 7:15–21:15 czasu polskiego
-    - cron: '15 6-20/2 * * 1-5'
+    # co godzinę w dni robocze, ok. 7:15–21:15 czasu polskiego
+    - cron: '15 6-20 * * 1-5'
   workflow_dispatch: {}
 
 permissions:

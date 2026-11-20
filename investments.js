@@ -207,7 +207,7 @@ export function holdingTotals(h) {
 export function createInvestments(deps) {
   const {
     db, ref, onValue, dbSet, container, getRates, fmt, escapeHtml,
-    onTotalChange, onSyncError,
+    onTotalChange, onSyncError, onRefresh,
   } = deps;
 
   const investmentsRef = ref(db, 'investments');
@@ -231,7 +231,10 @@ export function createInvestments(deps) {
   container.innerHTML = `
     <div id="inv-rate-banner" class="banner hidden"></div>
     <div class="inv-toolbar">
-      <p id="inv-asof" class="inv-asof"></p>
+      <div class="inv-asof-wrap">
+        <p id="inv-asof" class="inv-asof"></p>
+        <button id="inv-refresh-btn" class="text-btn" type="button">Odśwież kursy</button>
+      </div>
       <button id="inv-add-btn" class="primary">Dodaj</button>
     </div>
 
@@ -328,7 +331,7 @@ export function createInvestments(deps) {
 
   const $ = (id) => container.querySelector('#' + id);
   const el = {
-    banner: $('inv-rate-banner'), asof: $('inv-asof'), addBtn: $('inv-add-btn'), form: $('inv-form'),
+    banner: $('inv-rate-banner'), asof: $('inv-asof'), refreshBtn: $('inv-refresh-btn'), addBtn: $('inv-add-btn'), form: $('inv-form'),
     kindPicker: $('inv-kind-picker'), etfFields: $('inv-etf-fields'), preset: $('inv-preset'),
     customFields: $('inv-custom-fields'), ticker: $('inv-ticker'), currency: $('inv-currency'),
     name: $('inv-name'), desc: $('inv-desc'), lotFields: $('inv-lot-fields'), units: $('inv-units'),
@@ -736,6 +739,14 @@ export function createInvestments(deps) {
     el.bondDate.value = toIso(new Date());
     setKind('etf');
   }
+
+  el.refreshBtn.addEventListener('click', async () => {
+    el.refreshBtn.disabled = true;
+    el.refreshBtn.textContent = 'Odświeżanie…';
+    await Promise.all([loadFilePrices(), onRefresh ? onRefresh() : null]);
+    el.refreshBtn.disabled = false;
+    el.refreshBtn.textContent = 'Odśwież kursy';
+  });
 
   el.kindPicker.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => setKind(b.dataset.kind)));
   el.preset.addEventListener('change', () => setKind('etf'));

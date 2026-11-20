@@ -2012,6 +2012,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     fmt,
     escapeHtml,
     onTotalChange: (t) => { investTotals = t; updateFundTotals(); },
+    onRefresh: () => loadRates(),
     onSyncError: () => {
       syncStatusEl.textContent = 'Nie udało się zapisać lub odczytać inwestycji. Sprawdź połączenie albo reguły bazy w Firebase.';
       syncStatusEl.className = 'sync-note error';
