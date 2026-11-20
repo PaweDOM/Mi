@@ -1185,10 +1185,12 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   };
   const SHOPPING_TYPE_ORDER = ['dom', 'kaziczek', 'rosa', 'inne'];
 
+  // Nowe pozycje trafiają na górę listy: dostają numer mniejszy od
+  // najmniejszego (może być ujemny — sortowanie działa tak samo).
   function nextShoppingOrder(listName) {
     const items = shoppingItems[listName] || [];
     if (items.length === 0) return 0;
-    return Math.max(...items.map((i) => i.order ?? 0)) + 1;
+    return Math.min(...items.map((i) => i.order ?? 0)) - 1;
   }
 
   // For "comiesieczne" the group is its type; for "ogolne" it's simply
