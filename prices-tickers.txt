@@ -1,0 +1,6 @@
+# Tickery, dla których automat na GitHubie pobiera kursy (jeden w linii).
+# Format jak w aplikacji: Xetra z końcówką .DE, GPW .WA, USA .US albo bez końcówki.
+VWCE.DE
+SXR8.DE
+SXRV.DE
+TTWO.US

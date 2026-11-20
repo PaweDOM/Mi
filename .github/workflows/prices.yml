@@ -1,0 +1,33 @@
+name: Kursy ETF i akcji
+
+on:
+  schedule:
+    # co 2 godziny w dni robocze, ok. 7:15–21:15 czasu polskiego
+    - cron: '15 6-20/2 * * 1-5'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: prices
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/update-prices.mjs
+      - name: Zapisz kursy
+        run: |
+          git config user.name "kursy-bot"
+          git config user.email "kursy-bot@users.noreply.github.com"
+          git add prices.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Kursy $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git pull --rebase
+          git push

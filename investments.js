@@ -215,6 +215,7 @@ export function createInvestments(deps) {
 
   let items = [];
   let prices = {};
+  let filePrices = {}; // prices.json z automatu na GitHubie
   let expandedId = null;
   let formKind = 'etf';
   let listening = false;
@@ -351,6 +352,19 @@ export function createInvestments(deps) {
       prices = snap.val() || {};
       render();
     }, (e) => { console.error('Firebase prices read failed', e); });
+    loadFilePrices();
+    setInterval(loadFilePrices, 30 * 60 * 1000);
+  }
+
+  async function loadFilePrices() {
+    try {
+      const res = await fetch('prices.json', { cache: 'no-store' });
+      if (!res.ok) return;
+      filePrices = (await res.json()) || {};
+      render();
+    } catch (e) {
+      console.error('prices.json read failed', e);
+    }
   }
 
   async function save() {
@@ -375,7 +389,7 @@ export function createInvestments(deps) {
   }
 
   function priceInfo(h) {
-    const p = prices[priceKey(h.ticker)];
+    const p = prices[priceKey(h.ticker)] || filePrices[priceKey(h.ticker)];
     if (p && typeof p.price === 'number') return { price: p.price, currency: p.currency || h.currency, at: p.at, source: 'auto' };
     if (h.manualPrice && typeof h.manualPrice.price === 'number') return { price: h.manualPrice.price, currency: h.currency, at: h.manualPrice.at, source: 'manual' };
     return null;
@@ -486,7 +500,9 @@ export function createInvestments(deps) {
         <div class="row end"><button class="primary" data-add-lot="${h.id}">Dodaj zakup</button></div>
 
         <p class="detail-heading">Cena ręcznie</p>
-        <p class="hint">Używana tylko, gdy nie ma kursu pobranego automatycznie.</p>
+        <p class="hint">${v.pi && v.pi.source === 'auto'
+          ? 'Kurs pobiera się automatycznie, cena ręczna nie jest potrzebna.'
+          : `Brak kursu automatycznego. Dopisz ${escapeHtml(h.ticker)} do pliku prices-tickers.txt na GitHubie albo wpisz cenę tutaj.`}</p>
         <div class="row manual-row">
           <input type="text" inputmode="decimal" id="manual-price-${h.id}" placeholder="cena w ${escapeHtml(h.currency)}" value="${h.manualPrice ? String(h.manualPrice.price).replace('.', ',') : ''}" />
           <button data-manual-price="${h.id}">Zapisz cenę</button>
@@ -590,7 +606,7 @@ export function createInvestments(deps) {
 
     // kiedy kursy
     const ats = items.filter((h) => h.kind !== 'bond')
-      .map((h) => prices[priceKey(h.ticker)] && prices[priceKey(h.ticker)].at)
+      .map((h) => { const p = prices[priceKey(h.ticker)] || filePrices[priceKey(h.ticker)]; return p && p.at; })
       .filter(Boolean);
     if (ats.length) {
       const oldest = new Date(Math.min(...ats));
