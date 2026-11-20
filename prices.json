@@ -1,26 +1,26 @@
 {
   "VWCE_DE": {
     "ticker": "VWCE.DE",
-    "price": 160.58,
+    "price": 159.34,
     "currency": "EUR",
-    "at": 1795179262141
+    "at": 1795208766588
   },
   "SXR8_DE": {
     "ticker": "SXR8.DE",
-    "price": 699.98,
+    "price": 694.06,
     "currency": "EUR",
-    "at": 1795179262205
+    "at": 1795208766651
   },
   "SXRV_DE": {
     "ticker": "SXRV.DE",
-    "price": 1364.6,
+    "price": 1342.2,
     "currency": "EUR",
-    "at": 1795179262264
+    "at": 1795208766692
   },
   "TTWO_US": {
     "ticker": "TTWO.US",
-    "price": 208.65,
+    "price": 210,
     "currency": "USD",
-    "at": 1795179262327
+    "at": 1795208766729
   }
 }
