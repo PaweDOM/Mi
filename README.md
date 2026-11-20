@@ -10,8 +10,9 @@ Firebase backend:
   totals overview
 - **Wywóz śmieci** (Trash collection) — a calendar of pickup dates with
   reminders the day before
-- **Oszczędności** (Savings) — cash, foreign currency, and precious
-  metals valued live against current market rates
+- **Fundusz** (previously Oszczędności) — two tabs: **Skarbiec** (cash,
+  foreign currency, gold valued live against NBP rates) and
+  **Inwestycje** (ETFs, stocks and Polish treasury bonds)
 
 Installable as a PWA, no build step, backed by Firebase so anyone logged
 in with the household password sees the same live data.
@@ -99,7 +100,29 @@ there.
   municipal calendar lookup, so keep it updated as your local schedule
   changes (e.g. holidays shifting pickup days)
 
-## Oszczędności (Savings)
+## Fundusz → Inwestycje
+
+- ETFs (presets: FTSE All-World VWCE.DE, S&P 500 SXR8.DE, NASDAQ 100
+  SXRV.DE, or any other ticker), stocks (Yahoo tickers, e.g. PZU.WA)
+  and treasury bonds (OTS, ROR, DOR, TOS, COI, EDO, ROS, ROD)
+- ETFs/stocks: every purchase is stored separately (date, units —
+  fractional allowed — and amount paid in PLN). The row shows units,
+  current value in PLN and gain; the amount spent and current price
+  are shown in grey in brackets. Tap a row for the purchase list,
+  average cost, adding a purchase, manual price and deleting
+- Prices come from `/prices` in the database, written hourly by the
+  `updateInvestmentPrices` Cloud Function (see
+  `functions-snippet/investments-prices.js` — paste it into your
+  existing functions/index.js and deploy). Without it, set a price by
+  hand in the row's details. EUR/USD → PLN uses the NBP rate
+- Bonds: pick the type (term is filled in automatically), purchase
+  date, count (100 zł each), first-period rate and, for COI/EDO/ROS/ROD,
+  the margin over inflation. When a new interest year starts, the app
+  shows a banner (no push notifications) until you type the new rate in. Values are estimates before the 19%
+  tax and without early-redemption fees
+- Data lives in `/investments`; nothing in Skarbiec changed
+
+## Fundusz → Skarbiec (Savings)
 
 - Add two kinds of entries: **Pieniądze** (money — pick a currency, PLN/
   EUR/USD, and an amount) or **Kruszec** (gold — silver is skipped for
@@ -246,9 +269,11 @@ natively — worth asking for if this matters to you.
 ## Project structure
 
 ```
-index.html          # App markup: login screen + 3 sections
-style.css            # Styling
-app.js               # All app logic: auth, storage, rendering, notifications
+index.html          # App markup: login screen + 5 sections + bottom nav
+style.css            # Styling ("bank statement" look: navy header, ledger tables)
+app.js               # App logic: auth, storage, rendering, notifications
+investments.js       # Fundusz → Inwestycje (ETFs, stocks, bonds)
+functions-snippet/   # Cloud Function code to paste into your functions
 manifest.json        # PWA manifest (name, icons, install behavior)
 service-worker.js    # Offline caching of the app's own files
 ```

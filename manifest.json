@@ -3,8 +3,8 @@
   "short_name": "Dom",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#fafafa",
-  "theme_color": "#111111",
+  "background_color": "#E9ECF0",
+  "theme_color": "#0C2340",
   "icons": [
     {
       "src": "icon-192.png",

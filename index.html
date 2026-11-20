@@ -6,7 +6,10 @@
   <title>Zarządzanie domem</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
-  <meta name="theme-color" content="#111111" />
+  <meta name="theme-color" content="#0C2340" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Public+Sans:wght@400;500;600;700&display=swap" />
 </head>
 <body>
   <div id="login-screen" class="login-screen">
@@ -20,29 +23,26 @@
   </div>
 
   <div class="app hidden" id="app-root">
-    <div class="top-bar">
-      <p class="app-title">Zarządzanie domem</p>
-      <button id="logout-btn" class="text-btn" style="padding:0; font-size:12px;">Wyloguj się</button>
+    <div class="masthead">
+      <div class="top-bar">
+        <p class="app-title">Zarządzanie domem</p>
+        <button id="logout-btn" class="text-btn">Wyloguj się</button>
+      </div>
+      <p id="sync-status" class="sync-note">Łączenie…</p>
     </div>
-    <p id="sync-status" class="sync-note">Łączenie…</p>
 
-    <div class="section-nav">
-      <button id="nav-payments" class="section-tab active">Płatności</button>
-      <button id="nav-shopping" class="section-tab">Lista zakupów</button>
-      <button id="nav-pantry" class="section-tab">Składzik</button>
-      <button id="nav-trash" class="section-tab">Wywóz śmieci</button>
-      <button id="nav-savings" class="section-tab">Oszczędności</button>
-    </div>
 
     <!-- ===================== PŁATNOŚCI ===================== -->
     <div id="section-payments" class="section">
       <header>
         <div>
-          <p class="label">Suma miesięczna</p>
+          <p class="label" id="pay-month-label">Suma w tym miesiącu</p>
           <p class="total" id="total">0,00 zł</p>
         </div>
-        <button id="add-btn" class="primary">+ Dodaj płatność</button>
+        <button id="add-btn" class="primary">Nowa płatność</button>
       </header>
+
+      <div class="summary-lines" id="pay-summary"></div>
 
       <div class="tabs">
         <button id="tab-list" class="tab active">Lista</button>
@@ -292,75 +292,100 @@
       </div>
     </div>
 
-    <!-- ===================== OSZCZĘDNOŚCI ===================== -->
+    <!-- ===================== FUNDUSZ ===================== -->
     <div id="section-savings" class="section hidden">
       <header>
         <div>
-          <p class="label">Razem (wszystko)</p>
-          <p class="total" id="savings-grand-total">0,00 zł</p>
+          <p class="label">Fundusz razem</p>
+          <p class="total" id="fund-grand-total">0,00 zł</p>
+          <p class="header-sub" id="fund-gain"></p>
         </div>
-        <button id="savings-add-btn" class="primary">+ Dodaj</button>
       </header>
 
-      <p id="savings-rates-note" class="sync-note">Ładowanie kursów…</p>
-      <button id="savings-refresh-rates" class="text-btn" style="padding:0; margin: -12px 0 16px; font-size:12px;">Odśwież kursy</button>
-
-      <div id="savings-form" class="form hidden">
-        <div class="row" id="savings-kind-picker">
-          <button type="button" class="savings-kind-btn" data-kind="money">Pieniądze</button>
-          <button type="button" class="savings-kind-btn" data-kind="metal">Kruszec</button>
-        </div>
-
-        <div id="savings-money-fields">
-          <p class="inline-label" style="margin: 8px 0 4px;">Waluta</p>
-          <select id="s-currency" class="select">
-            <option value="PLN">PLN</option>
-            <option value="EUR">EUR</option>
-            <option value="USD">USD</option>
-          </select>
-          <p class="inline-label" style="margin: 8px 0 4px;">Kwota</p>
-          <input type="number" id="s-money-amount" placeholder="Kwota" min="0" step="0.01" />
-        </div>
-
-        <div id="savings-metal-fields" class="hidden">
-          <p class="inline-label" style="margin: 8px 0 4px;">Kruszec</p>
-          <p class="payment-detail" style="margin: 0 0 4px;">Złoto</p>
-
-          <p class="inline-label" style="margin: 8px 0 4px;">Jednostka</p>
-          <div class="row">
-            <button type="button" class="savings-unit-btn" data-unit="g">gram (g)</button>
-            <button type="button" class="savings-unit-btn" data-unit="oz">uncja (oz)</button>
-          </div>
-
-          <div id="savings-gram-amount-block">
-            <p class="inline-label" style="margin: 8px 0 4px;">Ilość (g)</p>
-            <input type="number" id="s-metal-amount" placeholder="Ilość" min="0" step="0.001" />
-          </div>
-
-          <div id="savings-oz-picker-block" class="hidden">
-            <p class="inline-label" style="margin: 8px 0 4px;">Ilość (oz)</p>
-            <div class="row" id="savings-oz-picker">
-              <button type="button" class="savings-oz-btn" data-oz="0.1">1/10 oz</button>
-              <button type="button" class="savings-oz-btn" data-oz="0.25">1/4 oz</button>
-              <button type="button" class="savings-oz-btn" data-oz="0.5">1/2 oz</button>
-              <button type="button" class="savings-oz-btn" data-oz="1">1 oz</button>
-            </div>
-          </div>
-        </div>
-
-        <p id="savings-error" class="error hidden"></p>
-        <div class="row end">
-          <button id="savings-cancel">Anuluj</button>
-          <button id="savings-save" class="primary">Zapisz</button>
-        </div>
+      <div class="fund-tabs" role="tablist">
+        <button id="fund-tab-vault" class="fund-tab active" role="tab" aria-selected="true">
+          <span class="fund-tab-label">Skarbiec</span>
+          <span class="fund-tab-value num" id="savings-grand-total">0,00 zł</span>
+        </button>
+        <button id="fund-tab-invest" class="fund-tab" role="tab" aria-selected="false">
+          <span class="fund-tab-label">Inwestycje</span>
+          <span class="fund-tab-value num" id="inv-grand-total">0,00 zł</span>
+        </button>
       </div>
 
-      <div id="savings-summary" class="list"></div>
+      <div id="fund-vault" class="fund-panel">
+        <p id="savings-rates-note" class="sync-note">Ładowanie kursów…</p>
+        <div class="inv-toolbar">
+          <button id="savings-refresh-rates" class="text-btn">Odśwież kursy</button>
+          <button id="savings-add-btn" class="primary">Dodaj</button>
+        </div>
 
-      <p class="pantry-group-heading">Pozycje</p>
-      <div id="savings-list" class="list"></div>
-      <p id="savings-empty" class="empty hidden">Brak zapisanych oszczędności. Dodaj pierwszą powyżej.</p>
+        <div id="savings-form" class="form hidden">
+          <div class="row" id="savings-kind-picker">
+            <button type="button" class="savings-kind-btn" data-kind="money">Pieniądze</button>
+            <button type="button" class="savings-kind-btn" data-kind="metal">Kruszec</button>
+          </div>
+
+          <div id="savings-money-fields">
+            <p class="inline-label" style="margin: 8px 0 4px;">Waluta</p>
+            <select id="s-currency" class="select">
+              <option value="PLN">PLN</option>
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+            </select>
+            <p class="inline-label" style="margin: 8px 0 4px;">Kwota</p>
+            <input type="number" id="s-money-amount" placeholder="Kwota" min="0" step="0.01" />
+          </div>
+
+          <div id="savings-metal-fields" class="hidden">
+            <p class="inline-label" style="margin: 8px 0 4px;">Kruszec</p>
+            <p class="payment-detail" style="margin: 0 0 4px;">Złoto</p>
+
+            <p class="inline-label" style="margin: 8px 0 4px;">Jednostka</p>
+            <div class="row">
+              <button type="button" class="savings-unit-btn" data-unit="g">gram (g)</button>
+              <button type="button" class="savings-unit-btn" data-unit="oz">uncja (oz)</button>
+            </div>
+
+            <div id="savings-gram-amount-block">
+              <p class="inline-label" style="margin: 8px 0 4px;">Ilość (g)</p>
+              <input type="number" id="s-metal-amount" placeholder="Ilość" min="0" step="0.001" />
+            </div>
+
+            <div id="savings-oz-picker-block" class="hidden">
+              <p class="inline-label" style="margin: 8px 0 4px;">Ilość (oz)</p>
+              <div class="row" id="savings-oz-picker">
+                <button type="button" class="savings-oz-btn" data-oz="0.1">1/10 oz</button>
+                <button type="button" class="savings-oz-btn" data-oz="0.25">1/4 oz</button>
+                <button type="button" class="savings-oz-btn" data-oz="0.5">1/2 oz</button>
+                <button type="button" class="savings-oz-btn" data-oz="1">1 oz</button>
+              </div>
+            </div>
+          </div>
+
+          <p id="savings-error" class="error hidden"></p>
+          <div class="row end">
+            <button id="savings-cancel">Anuluj</button>
+            <button id="savings-save" class="primary">Zapisz</button>
+          </div>
+        </div>
+
+        <div id="savings-summary" class="list"></div>
+
+        <p class="pantry-group-heading">Pozycje w Skarbcu</p>
+        <div id="savings-list" class="list"></div>
+        <p id="savings-empty" class="empty hidden">Skarbiec jest pusty. Dodaj gotówkę albo kruszec przyciskiem „Dodaj”.</p>
+      </div>
+
+      <div id="fund-invest" class="fund-panel hidden"></div>
     </div>
+    <nav class="section-nav" aria-label="Sekcje">
+      <button id="nav-payments" class="section-tab active"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 10h18M7 15h3"/></svg><span>Płatności</span></button>
+      <button id="nav-shopping" class="section-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.2 10.5h10.6L20 7H6.2"/><circle cx="9" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></svg><span>Zakupy</span></button>
+      <button id="nav-pantry" class="section-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8L12 4l8.5 4v8L12 20l-8.5-4z"/><path d="M3.5 8L12 12l8.5-4M12 12v8"/></svg><span>Składzik</span></button>
+      <button id="nav-trash" class="section-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6 7l1 13h10l1-13"/></svg><span>Śmieci</span></button>
+      <button id="nav-savings" class="section-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V11M10 19V6M16 19v-9M21 19H3"/></svg><span>Fundusz</span></button>
+    </nav>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>

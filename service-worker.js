@@ -26,8 +26,8 @@ messaging.onBackgroundMessage((payload) => {
 
 // --- Offline asset caching ---
 
-const CACHE_NAME = 'payment-reminders-v22';
-const ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.json'];
+const CACHE_NAME = 'payment-reminders-v23';
+const ASSETS = ['./', './index.html', './style.css', './app.js', './investments.js', './manifest.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -45,8 +45,21 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Najpierw sieć, potem pamięć podręczna: nowa wersja z GitHuba pokazuje się
+// od razu po odświeżeniu, a bez internetu aplikacja dalej działa.
 self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(req)
+      .then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
   );
 });

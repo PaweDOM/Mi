@@ -20,6 +20,8 @@ import {
   isSupported as isMessagingSupported,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
+import { createInvestments, formatPl } from "./investments.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyDQqsm2QzuZykRlngOsRmr--IeTGTynZCY",
   authDomain: "payment-reminders-d9e7f.firebaseapp.com",
@@ -202,6 +204,17 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const savingsListEl = document.getElementById('savings-list');
   const savingsEmptyEl = document.getElementById('savings-empty');
 
+  // --- Fundusz (Skarbiec + Inwestycje) ---
+  const fundGrandTotalEl = document.getElementById('fund-grand-total');
+  const fundGainEl = document.getElementById('fund-gain');
+  const fundTabVault = document.getElementById('fund-tab-vault');
+  const fundTabInvest = document.getElementById('fund-tab-invest');
+  const fundVaultPanel = document.getElementById('fund-vault');
+  const fundInvestPanel = document.getElementById('fund-invest');
+  const invGrandTotalEl = document.getElementById('inv-grand-total');
+  const paySummaryEl = document.getElementById('pay-summary');
+  const payMonthLabelEl = document.getElementById('pay-month-label');
+
   const PEOPLE = ['Paweł', 'Marta', 'Ogólne'];
   let activeFilter = 'All';
 
@@ -332,7 +345,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   }
 
   function fmt(n) {
-    return Number(n).toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' });
+    return formatPl(n, 2) + '\u00a0zł';
   }
 
   function escapeHtml(str) {
@@ -376,6 +389,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   function attachDataListeners() {
     if (listenersAttached) return;
     listenersAttached = true;
+    investments.attach();
 
     onValue(
       shoppingRef,
@@ -867,24 +881,30 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
         ? parseIsoDate(p.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
         : `dzień ${p.day}`;
 
+      const occ = nextOccurrence(p);
+      const dateTxt = occ
+        ? occ.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
+        : '—';
       const row = document.createElement('div');
-      row.className = 'payment-row';
+      row.className = 'payment-row status-' + st.cls;
+      row.title = dueLabel;
       row.innerHTML = `
-        <div class="payment-top">
-          <div>
+        <div class="pay-grid">
+          <p class="pay-date num">${dateTxt}</p>
+          <div class="pay-main">
             <p class="payment-name">${escapeHtml(p.name)}</p>
-            <p class="payment-detail">${fmt(p.amount)} · ${dueLabel} · ${freqLabel}</p>
             ${p.notes ? `<p class="payment-notes">${escapeHtml(p.notes)}</p>` : ''}
-            <span class="person-tag ${personTagClass(person)}">${escapeHtml(person)}</span>
+            <p class="payment-detail"><span class="person-tag ${personTagClass(person)}">${escapeHtml(person)}</span>, ${freqLabel}</p>
+            <span class="badge ${st.cls}">${st.label}</span>
           </div>
-          <span class="badge ${st.cls}">${st.label}</span>
+          <p class="pay-amount num">${fmt(p.amount)}</p>
         </div>
         <div class="payment-actions">
           <div class="action-btns">
             <button class="edit-btn" data-id="${p.id}">Edytuj</button>
             <button class="del-btn" data-id="${p.id}">Usuń</button>
           </div>
-          <button class="pay-btn" data-id="${p.id}">${isPaid ? 'Oznacz jako nieopłacone' : 'Oznacz jako opłacone'}</button>
+          <button class="pay-btn${isPaid ? '' : ' primary'}" data-id="${p.id}">${isPaid ? 'Cofnij zapłatę' : 'Zapłacone'}</button>
         </div>
       `;
       listEl.appendChild(row);
@@ -897,6 +917,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
       return isDueInMonth(p, now.getFullYear(), now.getMonth()) ? sum + Number(p.amount) : sum;
     }, 0);
     totalEl.textContent = fmt(total);
+    renderPaySummary(visible, total);
 
     listEl.querySelectorAll('.pay-btn').forEach((btn) => btn.addEventListener('click', () => togglePaid(btn.dataset.id)));
     listEl.querySelectorAll('.del-btn').forEach((btn) => btn.addEventListener('click', () => deletePayment(btn.dataset.id)));
@@ -941,6 +962,25 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
 
     onceElsewhereList.querySelectorAll('.del-btn').forEach((btn) => btn.addEventListener('click', () => deletePayment(btn.dataset.id)));
     onceElsewhereList.querySelectorAll('.edit-btn').forEach((btn) => btn.addEventListener('click', () => editPayment(btn.dataset.id)));
+  }
+
+  // Linie podsumowania pod nagłówkiem Płatności (jak na wyciągu bankowym).
+  function renderPaySummary(visible, total) {
+    const now = new Date();
+    const thisMonth = monthKey(now);
+    let paid = 0;
+    let overdue = 0;
+    visible.forEach((p) => {
+      if (!isDueInMonth(p, now.getFullYear(), now.getMonth())) return;
+      if (paidStatus[`${thisMonth}:${p.id}`]) paid += Number(p.amount);
+      else if (statusFor(p).cls === 'danger') overdue += Number(p.amount);
+    });
+    payMonthLabelEl.textContent = 'Suma, ' + now.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+    const line = (label, value, cls = '') => `
+      <div class="summary-line"><span>${label}</span><span class="leader"></span><span class="num ${cls}">${fmt(value)}</span></div>`;
+    paySummaryEl.innerHTML = line('Do zapłaty', Math.max(0, total - paid))
+      + line('Zapłacono', paid, 'pos')
+      + (overdue > 0 ? line('Po terminie lub dziś', overdue, 'neg') : '');
   }
 
   function togglePaid(id) {
@@ -1934,6 +1974,50 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
   const CURRENCY_LABELS = { PLN: 'PLN', EUR: 'EUR', USD: 'USD' };
 
   let editingSavingsId = null;
+  let vaultTotal = 0;
+  let investTotals = { total: 0, spent: 0, gain: 0 };
+
+  function updateFundTotals() {
+    fundGrandTotalEl.textContent = fmt(vaultTotal + investTotals.total);
+    invGrandTotalEl.textContent = fmt(investTotals.total);
+    if (investTotals.spent > 0) {
+      const g = investTotals.gain;
+      const pct = (g / investTotals.spent) * 100;
+      const sign = g > 0 ? '+' : g < 0 ? '−' : '';
+      fundGainEl.textContent = `${sign}${fmt(Math.abs(g))} (${sign}${Math.abs(pct).toLocaleString('pl-PL', { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%) na inwestycjach`;
+      fundGainEl.className = 'header-sub ' + (g >= 0 ? 'pos' : 'neg');
+    } else {
+      fundGainEl.textContent = '';
+    }
+  }
+
+  function showFundTab(name) {
+    const vault = name === 'vault';
+    fundTabVault.classList.toggle('active', vault);
+    fundTabInvest.classList.toggle('active', !vault);
+    fundTabVault.setAttribute('aria-selected', String(vault));
+    fundTabInvest.setAttribute('aria-selected', String(!vault));
+    fundVaultPanel.classList.toggle('hidden', !vault);
+    fundInvestPanel.classList.toggle('hidden', vault);
+    localStorage.setItem('payment-reminders:fundTab', name);
+  }
+
+  fundTabVault.addEventListener('click', () => showFundTab('vault'));
+  fundTabInvest.addEventListener('click', () => showFundTab('invest'));
+
+  const investments = createInvestments({
+    db, ref, onValue, dbSet,
+    container: fundInvestPanel,
+    getRates: () => ratesState,
+    fmt,
+    escapeHtml,
+    onTotalChange: (t) => { investTotals = t; updateFundTotals(); },
+    onSyncError: () => {
+      syncStatusEl.textContent = 'Nie udało się zapisać lub odczytać inwestycji. Sprawdź połączenie albo reguły bazy w Firebase.';
+      syncStatusEl.className = 'sync-note error';
+    },
+  });
+  showFundTab(localStorage.getItem('payment-reminders:fundTab') === 'invest' ? 'invest' : 'vault');
   let selectedSavingsKind = 'money';
   let selectedSavingsUnit = 'g';
   let selectedSavingsOz = null;
@@ -2025,6 +2109,7 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     }
 
     renderSavings();
+    investments.render();
   }
 
   savingsRefreshRates.addEventListener('click', loadRates);
@@ -2076,6 +2161,8 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     });
 
     savingsGrandTotalEl.textContent = fmt(grandTotal);
+    vaultTotal = grandTotal;
+    updateFundTotals();
 
     savingsSummaryEl.innerHTML = '';
     Object.values(categories)
