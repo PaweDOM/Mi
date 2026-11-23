@@ -303,6 +303,20 @@ setPersistence(auth, browserLocalPersistence).catch((e) => {
     let year = now.getFullYear();
     let month = now.getMonth();
     const today = new Date(year, month, now.getDate());
+    // Lista pokazuje bieżący miesiąc: płatność z terminem w tym miesiącu
+    // zostaje przy listopadowej dacie do końca miesiąca — zapłacona jako
+    // „Opłacone”, niezapłacona po terminie jako „Zaległe”. Na kolejny
+    // miesiąc przechodzi dopiero 1. dnia następnego miesiąca. (Wcześniej po
+    // terminie od razu przeskakiwała na następny miesiąc.)
+    // Wyjątek: płatność dodana już po tegomiesięcznym terminie i niezapłacona
+    // zaczyna od następnego miesiąca, żeby nie wisiała jako zaległa.
+    if (isDueInMonth(payment, year, month)) {
+      const dueThisMonth = new Date(year, month, payment.day);
+      const paid = !!paidStatus[`${monthKey(now)}:${payment.id}`];
+      const created = Number((String(payment.id).match(/^p(\d{13})/) || [])[1]) || 0;
+      const addedAfterDue = created > dueThisMonth.getTime() + 86400000;
+      if (dueThisMonth >= today || paid || !addedAfterDue) return dueThisMonth;
+    }
     for (let i = 0; i < 36; i++) {
       if (isDueInMonth(payment, year, month)) {
         const due = new Date(year, month, payment.day);

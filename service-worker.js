@@ -26,7 +26,7 @@ messaging.onBackgroundMessage((payload) => {
 
 // --- Offline asset caching ---
 
-const CACHE_NAME = 'payment-reminders-v24';
+const CACHE_NAME = 'payment-reminders-v25';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './investments.js', './manifest.json'];
 
 self.addEventListener('install', (event) => {
